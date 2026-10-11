@@ -8,4 +8,5 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.0]
 
-- First release.
+- First release: `nth_weekday`, `last_weekday`, `week_of_month`,
+  `weekdays_in_month`, and the `MONDAY` through `SUNDAY` constants.
