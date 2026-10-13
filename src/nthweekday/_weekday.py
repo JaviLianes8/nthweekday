@@ -1,64 +1,92 @@
-"""Nth-weekday-of-a-month queries built on the standard library only."""
+"""The ``Weekday`` enum and the argument checks every query shares."""
 
 from __future__ import annotations
 
-import calendar
-from datetime import date
+from datetime import MAXYEAR, MINYEAR, date
+from enum import IntEnum
 
-MONDAY = 0
-TUESDAY = 1
-WEDNESDAY = 2
-THURSDAY = 3
-FRIDAY = 4
-SATURDAY = 5
-SUNDAY = 6
-
-_ORDINALS = {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth"}
+_CODES = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
 
 
-def _check(year: int, month: int, weekday: int) -> None:
-    if not 1 <= month <= 12:
-        raise ValueError(f"month must be in 1..12, got {month}")
-    if not MONDAY <= weekday <= SUNDAY:
-        raise ValueError(f"weekday must be in 0..6 (Monday=0), got {weekday}")
-    date(year, 1, 1)  # reject a year outside the supported range early
+class Weekday(IntEnum):
+    """A day of the week numbered like ``date.weekday()``: Monday is 0, Sunday is 6.
 
-
-def weekdays_in_month(year: int, month: int, weekday: int) -> list[date]:
-    """Every date in the month that falls on ``weekday`` (Monday=0), in order."""
-    _check(year, month, weekday)
-    _, days = calendar.monthrange(year, month)
-    return [d for day in range(1, days + 1) if (d := date(year, month, day)).weekday() == weekday]
-
-
-def nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
-    """The ``n``-th ``weekday`` of the month (Monday=0).
-
-    ``n`` is 1..5 counting from the start, or -1 for the last. Raises
-    ``ValueError`` when the requested occurrence does not exist, such as a fifth
-    one in a month that only has four.
+    Members are plain ints, so they work anywhere a ``date.weekday()`` value does.
     """
-    occurrences = weekdays_in_month(year, month, weekday)
-    if n == -1:
-        return occurrences[-1]
-    if not 1 <= n <= 5:
-        raise ValueError(f"n must be in 1..5 or -1, got {n}")
-    if n > len(occurrences):
-        name = calendar.day_name[weekday]
-        raise ValueError(f"{year}-{month:02d} has no {_ORDINALS[n]} {name}")
-    return occurrences[n - 1]
+
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THURSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
+    def __repr__(self) -> str:
+        return f"Weekday.{self.name}"
+
+    @property
+    def iso(self) -> int:
+        """ISO 8601 number, as ``date.isoweekday()``: Monday is 1, Sunday is 7."""
+        return self.value + 1
+
+    @property
+    def code(self) -> str:
+        """The two-letter RFC 5545 code, such as ``MO``."""
+        return _CODES[self.value]
+
+    @classmethod
+    def from_iso(cls, number: int) -> Weekday:
+        """The weekday with ISO number ``number`` (1 is Monday, 7 is Sunday)."""
+        if not _is_int(number) or not 1 <= number <= 7:
+            raise ValueError(f"ISO weekday must be an int in 1..7, got {number!r}")
+        return cls(number - 1)
+
+    @classmethod
+    def parse(cls, text: str) -> Weekday:
+        """Read a weekday from ``MO``, ``Mon`` or ``Monday``, in any letter case."""
+        if not isinstance(text, str):
+            raise TypeError(f"weekday name must be a str, got {type(text).__name__}")
+        found = _NAMES.get(text.upper()) if text.isascii() else None
+        if found is None:
+            raise ValueError(f"unknown weekday name {text!r}")
+        return found
 
 
-def last_weekday(year: int, month: int, weekday: int) -> date:
-    """The last ``weekday`` of the month (Monday=0)."""
-    return weekdays_in_month(year, month, weekday)[-1]
+_NAMES: dict[str, Weekday] = {}
+for _day in Weekday:
+    _NAMES[_day.code] = _day
+    _NAMES[_day.name[:3]] = _day
+    _NAMES[_day.name] = _day
 
 
-def week_of_month(d: date) -> int:
-    """Which week of its month ``d`` falls in, counting from 1.
+def _is_int(value: object) -> bool:
+    # bool is an int subclass; True as a month or weekday is a bug, never intent.
+    return isinstance(value, int) and not isinstance(value, bool)
 
-    Weeks start on Monday: week 1 holds the first of the month through the first
-    Sunday, matching ``calendar.monthcalendar`` rows.
-    """
-    first_weekday, _ = calendar.monthrange(d.year, d.month)
-    return (first_weekday + d.day - 1) // 7 + 1
+
+def _int_in(name: str, value: object, low: int, high: int) -> int:
+    if not _is_int(value):
+        raise TypeError(f"{name} must be an int, got {type(value).__name__}")
+    assert isinstance(value, int)
+    if not low <= value <= high:
+        raise ValueError(f"{name} must be in {low}..{high}, got {value}")
+    return value
+
+
+def check_year(year: object) -> int:
+    return _int_in("year", year, MINYEAR, MAXYEAR)
+
+
+def check_month(month: object) -> int:
+    return _int_in("month", month, 1, 12)
+
+
+def check_weekday(weekday: object) -> Weekday:
+    return Weekday(_int_in("weekday", weekday, 0, 6))
+
+
+def check_date(value: object) -> date:
+    if not isinstance(value, date):
+        raise TypeError(f"expected a datetime.date, got {type(value).__name__}")
+    return value

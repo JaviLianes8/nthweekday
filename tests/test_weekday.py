@@ -1,84 +1,56 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
-from nthweekday import (
-    FRIDAY,
-    MONDAY,
-    THURSDAY,
-    last_weekday,
-    nth_weekday,
-    week_of_month,
-    weekdays_in_month,
+from nthweekday import MONDAY, SUNDAY, Weekday
+
+
+def test_numbering_matches_date_weekday_and_isoweekday() -> None:
+    # 2026-10-12 is a Monday; walk a whole week.
+    for offset in range(7):
+        d = date(2026, 10, 12) + timedelta(days=offset)
+        day = Weekday(d.weekday())
+        assert day.iso == d.isoweekday()
+        assert Weekday.from_iso(d.isoweekday()) is day
+
+
+def test_iso_numbers_at_both_ends() -> None:
+    assert (MONDAY.iso, SUNDAY.iso) == (1, 7)
+
+
+@pytest.mark.parametrize("bad", [0, 8, -1, True, 1.0, "1"])
+def test_from_iso_rejects_out_of_range_and_non_int(bad: object) -> None:
+    with pytest.raises(ValueError, match="ISO weekday"):
+        Weekday.from_iso(bad)  # type: ignore[arg-type]
+
+
+def test_codes_follow_rfc5545() -> None:
+    assert [d.code for d in Weekday] == ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("MO", Weekday.MONDAY),
+        ("mo", Weekday.MONDAY),
+        ("Tue", Weekday.TUESDAY),
+        ("wednesday", Weekday.WEDNESDAY),
+        ("THURSDAY", Weekday.THURSDAY),
+        ("Fr", Weekday.FRIDAY),
+        ("sat", Weekday.SATURDAY),
+        ("Sunday", Weekday.SUNDAY),
+    ],
 )
+def test_parse_accepts_codes_short_and_full_names(text: str, expected: Weekday) -> None:
+    assert Weekday.parse(text) is expected
 
 
-def test_third_thursday() -> None:
-    assert nth_weekday(2026, 10, THURSDAY, 3) == date(2026, 10, 15)
+@pytest.mark.parametrize("bad", ["", "M", "Mond", " MO", "MO ", "Tues", "lunes", "\u039cO"])
+def test_parse_rejects_anything_else(bad: str) -> None:
+    with pytest.raises(ValueError, match="unknown weekday"):
+        Weekday.parse(bad)
 
 
-def test_first_monday() -> None:
-    assert nth_weekday(2026, 10, MONDAY, 1) == date(2026, 10, 5)
-
-
-def test_last_friday() -> None:
-    assert last_weekday(2026, 10, FRIDAY) == date(2026, 10, 30)
-
-
-def test_negative_one_means_last() -> None:
-    assert nth_weekday(2026, 10, FRIDAY, -1) == last_weekday(2026, 10, FRIDAY)
-
-
-def test_fifth_occurrence_present() -> None:
-    assert nth_weekday(2026, 10, THURSDAY, 5) == date(2026, 10, 29)
-
-
-def test_fifth_occurrence_absent_raises() -> None:
-    with pytest.raises(ValueError, match="no fifth"):
-        nth_weekday(2026, 9, MONDAY, 5)
-
-
-def test_week_of_month() -> None:
-    assert week_of_month(date(2026, 10, 1)) == 1
-    assert week_of_month(date(2026, 10, 15)) == 3
-    assert week_of_month(date(2026, 10, 31)) == 5
-
-
-def test_weekdays_in_month_count_five() -> None:
-    assert len(weekdays_in_month(2026, 10, THURSDAY)) == 5
-
-
-def test_weekdays_in_month_count_four() -> None:
-    assert len(weekdays_in_month(2026, 9, MONDAY)) == 4
-
-
-def test_leap_february_has_five_thursdays() -> None:
-    assert weekdays_in_month(2024, 2, THURSDAY) == [
-        date(2024, 2, 1),
-        date(2024, 2, 8),
-        date(2024, 2, 15),
-        date(2024, 2, 22),
-        date(2024, 2, 29),
-    ]
-    assert last_weekday(2024, 2, THURSDAY) == date(2024, 2, 29)
-
-
-def test_short_february_has_four_thursdays() -> None:
-    assert len(weekdays_in_month(2023, 2, THURSDAY)) == 4
-    with pytest.raises(ValueError):
-        nth_weekday(2023, 2, THURSDAY, 5)
-
-
-def test_rejects_bad_weekday() -> None:
-    with pytest.raises(ValueError, match="weekday"):
-        weekdays_in_month(2026, 10, 7)
-
-
-def test_rejects_bad_month() -> None:
-    with pytest.raises(ValueError, match="month"):
-        weekdays_in_month(2026, 13, MONDAY)
-
-
-def test_rejects_bad_n() -> None:
-    with pytest.raises(ValueError, match="n must be"):
-        nth_weekday(2026, 10, MONDAY, 6)
+def test_parse_rejects_non_strings() -> None:
+    with pytest.raises(TypeError):
+        Weekday.parse(0)  # type: ignore[arg-type]

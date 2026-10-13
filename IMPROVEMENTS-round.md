@@ -2,13 +2,13 @@
 
 Progress:
 - [x] Brainstorm ranked improvements (this file)
-- [ ] Pin the ground truth: upstream copies in a local folder with a tracked manifest
-- [ ] Typed weekdays: `Weekday` enum, ISO numbering, name parsing
-- [ ] Full ordinal range: `n` in 1..5 and -5..-1, a dedicated error for absent days
-- [ ] Ordinal of a date, next and previous weekday, Sunday-start weeks
-- [ ] RFC 5545 BYDAY: parse, format, monthly and yearly expansion
-- [ ] Command line tool
-- [ ] Contracts: dateutil oracle, RFC vectors, US federal and UK bank holidays, README examples
+- [x] Pin the ground truth: upstream copies in a local folder with a tracked manifest
+- [x] Typed weekdays: `Weekday` enum, ISO numbering, name parsing
+- [x] Full ordinal range: `n` in 1..5 and -5..-1, a dedicated error for absent days
+- [x] Ordinal of a date, next and previous weekday, Sunday-start weeks
+- [x] RFC 5545 BYDAY: parse, format, monthly and yearly expansion
+- [x] Command line tool
+- [x] Contracts: dateutil oracle, RFC vectors, US federal and UK bank holidays, README examples
 - [ ] Docs and packaging: README, CHANGELOG, metadata, installed-wheel e2e test
 - [ ] Gates: ruff format, ruff check, mypy --strict, pytest
 - [ ] Mutation run: removing guarded logic makes the suite fail
