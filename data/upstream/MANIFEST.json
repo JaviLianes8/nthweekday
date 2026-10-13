@@ -1,0 +1,47 @@
+{
+  "rfc5545.txt": {
+    "title": "RFC 5545, Internet Calendaring and Scheduling Core Object Specification (iCalendar)",
+    "url": "https://www.rfc-editor.org/rfc/rfc5545.txt",
+    "revision": "RFC 5545 (September 2009)",
+    "licence": "IETF Trust Legal Provisions (https://trustee.ietf.org/license-info)",
+    "fetched": "2026-10-13",
+    "size": 345537,
+    "sha256": "c256f809479d98aa23d71bbd1658b3800ea9f13f41ca56e59c8d2de1b31cbfcb"
+  },
+  "usc-5-6103.htm": {
+    "title": "5 U.S.C. 6103, Holidays (United States Code, 2023 edition)",
+    "url": "https://www.govinfo.gov/content/pkg/USCODE-2023-title5/html/USCODE-2023-title5-partIII-subpartE-chap61-subchapI-sec6103.htm",
+    "revision": "USCODE-2023",
+    "licence": "US government work, public domain",
+    "fetched": "2026-10-13",
+    "size": 17224,
+    "sha256": "0c3ef0793a5a8106354d3d3f3d4dc0e9aa9de7803325d01ca95048ff9c4cd806"
+  },
+  "opm-federal-holidays.html": {
+    "title": "OPM, Federal Holidays (schedules 2011 to 2030)",
+    "url": "https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/",
+    "revision": "live page",
+    "licence": "US government work, public domain",
+    "fetched": "2026-10-13",
+    "size": 151930,
+    "sha256": "3797368151ea3b4264f54287097a2120ea9391715fd2b6e6ab7266e4c6bf2e92"
+  },
+  "uk-bfda-1971-schedule-1.html": {
+    "title": "Banking and Financial Dealings Act 1971, schedule 1 (as amended)",
+    "url": "https://www.legislation.gov.uk/ukpga/1971/80/schedule/1",
+    "revision": "latest available version",
+    "licence": "Open Government Licence v3.0",
+    "fetched": "2026-10-13",
+    "size": 33645,
+    "sha256": "a3d6bf1a7665574d424c080f0afae3ffcd462a3f8a54b7af6055d695545a5efb"
+  },
+  "uk-bank-holidays.json": {
+    "title": "GOV.UK bank holidays (England and Wales, Scotland, Northern Ireland)",
+    "url": "https://www.gov.uk/bank-holidays.json",
+    "revision": "live dataset",
+    "licence": "Open Government Licence v3.0",
+    "fetched": "2026-10-13",
+    "size": 22207,
+    "sha256": "538b3482c28b85ecd2db606a0d5ae6ad17248900b6498700ce0a48d26a3ecde6"
+  }
+}

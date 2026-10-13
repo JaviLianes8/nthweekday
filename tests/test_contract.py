@@ -12,8 +12,17 @@ PUBLIC_API: list[str] = [
     "THURSDAY",
     "TUESDAY",
     "WEDNESDAY",
+    "ByDay",
+    "NoSuchDayError",
+    "Weekday",
+    "byday_dates",
     "last_weekday",
+    "next_weekday",
     "nth_weekday",
+    "nth_weekday_in_year",
+    "ordinal_of",
+    "parse_byday",
+    "previous_weekday",
     "week_of_month",
     "weekdays_in_month",
 ]
@@ -36,3 +45,15 @@ def test_version_is_a_three_part_string() -> None:
 
 def test_the_package_ships_type_information() -> None:
     assert importlib.resources.files("nthweekday").joinpath("py.typed").is_file()
+
+
+def test_day_constants_are_the_enum_members_and_plain_ints() -> None:
+    names = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+    for number, name in enumerate(names):
+        value = getattr(nthweekday, name)
+        assert value is nthweekday.Weekday[name]
+        assert value == number and isinstance(value, int)
+
+
+def test_no_such_day_error_is_a_value_error() -> None:
+    assert issubclass(nthweekday.NoSuchDayError, ValueError)
