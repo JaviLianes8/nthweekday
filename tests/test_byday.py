@@ -44,6 +44,9 @@ def test_parse_is_case_insensitive() -> None:
         "1MO;2TU",
         "\uff11MO",
         "1M\u039f",
+        "1\u017fU",
+        "001MO",
+        "+001MO",
     ],
 )
 def test_parse_rejects_anything_outside_the_grammar(bad: str) -> None:
@@ -99,6 +102,12 @@ def test_byday_dates_absent_occurrence_selects_nothing() -> None:
 def test_byday_dates_yearly_plain_weekday_covers_the_year() -> None:
     assert len(byday_dates(2026, None, "TH")) == 53  # 2026 starts on a Thursday
     assert len(byday_dates(2026, None, "FR")) == 52
+
+
+def test_byday_dates_yearly_absent_53rd_selects_nothing() -> None:
+    # 2026 starts and ends on a Thursday, so it has 53 Thursdays and 52 Fridays.
+    assert byday_dates(2026, None, "53TH") == [date(2026, 12, 31)]
+    assert byday_dates(2026, None, "53FR,-53FR") == []
 
 
 def test_byday_dates_at_the_calendar_limits() -> None:

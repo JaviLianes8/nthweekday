@@ -9,9 +9,9 @@ Progress:
 - [x] RFC 5545 BYDAY: parse, format, monthly and yearly expansion
 - [x] Command line tool
 - [x] Contracts: dateutil oracle, RFC vectors, US federal and UK bank holidays, README examples
-- [ ] Docs and packaging: README, CHANGELOG, metadata, installed-wheel e2e test
-- [ ] Gates: ruff format, ruff check, mypy --strict, pytest
-- [ ] Mutation run: removing guarded logic makes the suite fail
+- [x] Docs and packaging: README, CHANGELOG, metadata, installed-wheel e2e test
+- [x] Gates: ruff format, ruff check, mypy --strict, pytest
+- [x] Mutation run: removing guarded logic makes the suite fail
 - [ ] Independent review findings fixed with regression tests
 - [ ] Pull request opened, guard clean
 

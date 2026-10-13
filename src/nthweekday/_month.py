@@ -27,7 +27,8 @@ def _ordinal_words(n: int) -> str:
             return _ORDINALS[n - 1]
         suffix = "th" if n % 100 in (11, 12, 13) else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
         return f"{n}{suffix}"
-    return "last" if n == -1 else f"{_ordinal_words(-n)}-to-last"
+    # Only -5 can be absent in a month and only -53 in a year, so -1 needs no "last".
+    return f"{_ordinal_words(-n)}-to-last"
 
 
 def _pick(days: range, n: int, where: str, day: Weekday) -> int:

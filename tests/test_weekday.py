@@ -45,7 +45,9 @@ def test_parse_accepts_codes_short_and_full_names(text: str, expected: Weekday) 
     assert Weekday.parse(text) is expected
 
 
-@pytest.mark.parametrize("bad", ["", "M", "Mond", " MO", "MO ", "Tues", "lunes", "\u039cO"])
+@pytest.mark.parametrize(
+    "bad", ["", "M", "Mond", " MO", "MO ", "Tues", "lunes", "\u039cO", "\u017fu", "\u017fun"]
+)
 def test_parse_rejects_anything_else(bad: str) -> None:
     with pytest.raises(ValueError, match="unknown weekday"):
         Weekday.parse(bad)

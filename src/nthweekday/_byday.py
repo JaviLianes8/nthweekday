@@ -49,7 +49,8 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
         raise TypeError(f"BYDAY value must be a str, got {type(value).__name__}")
     entries = []
     for item in value.split(","):
-        match = _WEEKDAYNUM.fullmatch(item) if item.isascii() else None
+        # A non-ASCII letter that case-folds into a code still fails in Weekday.parse.
+        match = _WEEKDAYNUM.fullmatch(item)
         if match is None:
             raise ValueError(f"invalid BYDAY entry {item!r} in {value!r}")
         sign, digits, code = match.groups()
