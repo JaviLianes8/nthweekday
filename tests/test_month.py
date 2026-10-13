@@ -93,8 +93,8 @@ def test_century_rule_1900_is_not_leap_but_2000_is() -> None:
         ((2026, 10, -1, 1), "weekday must be in 0..6"),
         ((2026, 10, 7, 1), "weekday must be in 0..6"),
         ((2026, 10, MONDAY, 0), "n must be in 1..5 or -5..-1"),
-        ((2026, 10, MONDAY, 6), "n must be in -5..5"),
-        ((2026, 10, MONDAY, -6), "n must be in -5..5"),
+        ((2026, 10, MONDAY, 6), "n must be in 1..5 or -5..-1, got 6"),
+        ((2026, 10, MONDAY, -6), "n must be in 1..5 or -5..-1, got -6"),
     ],
 )
 def test_rejects_out_of_range_arguments(args: tuple[int, int, int, int], message: str) -> None:
@@ -131,3 +131,18 @@ def test_weekdays_in_month_validates_like_nth_weekday() -> None:
 def test_results_are_plain_dates() -> None:
     got = nth_weekday(2026, 10, MONDAY, 1)
     assert type(got) is date and not isinstance(got, datetime)
+
+
+class _Index:
+    """An integer type that is not int, like numpy.int64: it only offers __index__."""
+
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def __index__(self) -> int:
+        return self.value
+
+
+def test_accepts_integer_types_through_index() -> None:
+    got = nth_weekday(_Index(2026), _Index(11), _Index(3), _Index(4))  # type: ignore[arg-type]
+    assert got == date(2026, 11, 26)

@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tarfile
 import venv
 import zipfile
 from pathlib import Path
@@ -77,3 +78,15 @@ def test_wheel_installs_and_the_script_works(tmp_path: Path) -> None:
     )
     shown = _run([str(python), "-c", probe]).stdout
     assert shown.startswith("2026-11-26 (ByDay(Weekday.FRIDAY, -1),) ") and str(env_dir) in shown
+
+
+@pytest.mark.e2e
+def test_sdist_ships_the_manifest_but_no_upstream_copies(tmp_path: Path) -> None:
+    built = _run([sys.executable, "-m", "build", "--sdist", "--outdir", str(tmp_path), str(ROOT)])
+    assert built.returncode == 0, built.stderr
+    (sdist,) = tmp_path.glob("nthweekday-*.tar.gz")
+    with tarfile.open(sdist) as archive:
+        names = [name.split("/", 1)[1] for name in archive.getnames() if "/" in name]
+    assert "data/upstream/MANIFEST.json" in names
+    assert "scripts/fetch_upstream.py" in names and "tests/conftest.py" in names
+    assert [n for n in names if n.startswith("data/")] == ["data/upstream/MANIFEST.json"]

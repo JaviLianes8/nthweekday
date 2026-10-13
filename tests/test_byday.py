@@ -95,6 +95,23 @@ def test_byday_dates_accepts_a_byday_value() -> None:
     assert byday_dates(2026, 11, ByDay(Weekday.THURSDAY, 4)) == [date(2026, 11, 26)]
 
 
+def test_byday_dates_accepts_what_parse_byday_returns() -> None:
+    parsed = parse_byday("1SU,-1SU")
+    assert byday_dates(2026, 3, parsed) == byday_dates(2026, 3, "1SU,-1SU")
+    assert byday_dates(2026, 3, iter(parsed)) == [date(2026, 3, 1), date(2026, 3, 29)]
+
+
+def test_byday_dates_rejects_other_entries() -> None:
+    with pytest.raises(TypeError, match="ByDay entries"):
+        byday_dates(2026, 3, ["1SU"])  # type: ignore[list-item]
+
+
+def test_non_ascii_letters_are_reported_as_invalid_entries() -> None:
+    for bad in ("\u017fu", "1\u017fU", "-1\u212aR"):
+        with pytest.raises(ValueError, match="invalid BYDAY entry"):
+            parse_byday(bad)
+
+
 def test_byday_dates_absent_occurrence_selects_nothing() -> None:
     assert byday_dates(2026, 9, "5MO") == []
 

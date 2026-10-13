@@ -59,8 +59,7 @@ def nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
     fifth Monday in a month with four.
     """
     year, month, day = check_year(year), check_month(month), check_weekday(weekday)
-    if _int_in("n", n, -5, 5) == 0:
-        raise ValueError("n must be in 1..5 or -5..-1, got 0")
+    n = _int_in("n", n, -5, 5, nonzero=True)
     where = f"{year:04d}-{month:02d}"
     return date(year, month, _pick(_month_days(year, month, day), n, where, day))
 
@@ -77,8 +76,7 @@ def nth_weekday_in_year(year: int, weekday: int, n: int) -> date:
     year that has only 52.
     """
     year, day = check_year(year), check_weekday(weekday)
-    if _int_in("n", n, -53, 53) == 0:
-        raise ValueError("n must be in 1..53 or -53..-1, got 0")
+    n = _int_in("n", n, -53, 53, nonzero=True)
     start = date(year, 1, 1)
     length = 366 if calendar.isleap(year) else 365
     offsets = range((day - start.weekday()) % 7, length, 7)

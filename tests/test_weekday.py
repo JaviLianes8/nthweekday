@@ -18,10 +18,21 @@ def test_iso_numbers_at_both_ends() -> None:
     assert (MONDAY.iso, SUNDAY.iso) == (1, 7)
 
 
-@pytest.mark.parametrize("bad", [0, 8, -1, True, 1.0, "1"])
-def test_from_iso_rejects_out_of_range_and_non_int(bad: object) -> None:
-    with pytest.raises(ValueError, match="ISO weekday"):
+@pytest.mark.parametrize("bad", [0, 8, -1])
+def test_from_iso_rejects_out_of_range(bad: int) -> None:
+    with pytest.raises(ValueError, match=r"ISO weekday must be in 1\.\.7"):
+        Weekday.from_iso(bad)
+
+
+@pytest.mark.parametrize("bad", [True, 1.0, "1", None])
+def test_from_iso_rejects_non_int_with_type_error(bad: object) -> None:
+    with pytest.raises(TypeError, match="ISO weekday must be an int"):
         Weekday.from_iso(bad)  # type: ignore[arg-type]
+
+
+def test_str_is_the_name_on_every_python() -> None:
+    assert str(Weekday.MONDAY) == "MONDAY"
+    assert f"{Weekday.SUNDAY}" == "SUNDAY"
 
 
 def test_codes_follow_rfc5545() -> None:

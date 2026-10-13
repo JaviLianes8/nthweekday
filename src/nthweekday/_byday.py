@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from calendar import monthrange
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -28,8 +29,9 @@ class ByDay:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "weekday", check_weekday(self.weekday))
-        if self.ordinal is not None and _int_in("ordinal", self.ordinal, -53, 53) == 0:
-            raise ValueError("ordinal must be in 1..53 or -53..-1, got 0")
+        if self.ordinal is not None:
+            ordinal = _int_in("ordinal", self.ordinal, -53, 53, nonzero=True)
+            object.__setattr__(self, "ordinal", ordinal)
 
     def __repr__(self) -> str:
         tail = "" if self.ordinal is None else f", {self.ordinal}"
@@ -49,8 +51,8 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
         raise TypeError(f"BYDAY value must be a str, got {type(value).__name__}")
     entries = []
     for item in value.split(","):
-        # A non-ASCII letter that case-folds into a code still fails in Weekday.parse.
-        match = _WEEKDAYNUM.fullmatch(item)
+        # IGNORECASE folds some non-ASCII letters into codes (long s matches S).
+        match = _WEEKDAYNUM.fullmatch(item) if item.isascii() else None
         if match is None:
             raise ValueError(f"invalid BYDAY entry {item!r} in {value!r}")
         sign, digits, code = match.groups()
@@ -61,18 +63,26 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
     return tuple(entries)
 
 
-def byday_dates(year: int, month: int | None, value: str | ByDay) -> list[date]:
+def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDay]) -> list[date]:
     """The dates a BYDAY value selects in one month, or in a whole year with ``month=None``.
 
     With a month this is the MONTHLY meaning: ``2MO`` is the second Monday of that month
     and an ordinal past the last occurrence selects nothing. With ``month=None`` it is the
-    YEARLY meaning without BYMONTH: ``20MO`` is the twentieth Monday of the year. The
-    result is sorted and has no duplicates.
+    YEARLY meaning without BYMONTH: ``20MO`` is the twentieth Monday of the year.
+    ``value`` is a BYDAY string, one ``ByDay`` or several (what ``parse_byday`` returns).
+    The result is sorted and has no duplicates.
     """
     year = check_year(year)
     if month is not None:
         month = check_month(month)
-    entries = (value,) if isinstance(value, ByDay) else parse_byday(value)
+    if isinstance(value, str):
+        entries = parse_byday(value)
+    elif isinstance(value, ByDay):
+        entries = (value,)
+    else:
+        entries = tuple(value)
+        if not all(isinstance(e, ByDay) for e in entries):
+            raise TypeError("value must be a BYDAY string, a ByDay or ByDay entries")
     if month is None:
         start, end = date(year, 1, 1), date(year, 12, 31)
     else:

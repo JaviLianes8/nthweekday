@@ -23,7 +23,8 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - Arguments are checked strictly: years 1 to 9999, and `bool`, `float` or `str` values
-  raise `TypeError` instead of being accepted or failing later.
+  raise `TypeError` instead of being accepted or failing later. Integer types other
+  than `int` (such as numpy integers) are still accepted through `__index__`.
 
 ## [0.1.0]
 

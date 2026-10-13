@@ -7,6 +7,7 @@ fetched, the test checks both still appear in it word for word.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 import pytest
@@ -72,4 +73,7 @@ def test_vectors_appear_in_the_fetched_rfc() -> None:
         start, recur = rule.split(" ", 1)
         quoted.append((start, recur))
     for first, second in quoted:
-        assert first in text and second in text, (first, second)
+        # The second part must follow the first closely: the dates belong to that rule
+        # (or the RRULE to that DTSTART), not to another example elsewhere in the RFC.
+        near = re.escape(first) + ".{0,400}?" + re.escape(second)
+        assert re.search(near, text), (first, second)

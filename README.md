@@ -72,8 +72,9 @@ Weekday.MONDAY.iso  # -> 1
 Weekday.THURSDAY.code  # -> 'TH'
 ```
 
-Every argument is checked: years 1 to 9999 (the range `datetime` supports), months 1 to
-12, weekdays 0 to 6, and `bool` or `float` values are refused with `TypeError`.
+Every function checks its arguments: years 1 to 9999 (the range `datetime` supports),
+months 1 to 12, weekdays 0 to 6. Any integer type works (numpy integers included), while
+`bool`, `float` and `str` values are refused with `TypeError`.
 
 ## RFC 5545 BYDAY
 
@@ -83,6 +84,7 @@ from nthweekday import ByDay, byday_dates, nth_weekday_in_year, parse_byday
 parse_byday("1SU,-1SU")  # -> (ByDay(Weekday.SUNDAY, 1), ByDay(Weekday.SUNDAY, -1))
 str(ByDay(FRIDAY, -1))  # -> '-1FR'
 [d.day for d in byday_dates(2026, 3, "1SU,-1SU")]  # -> [1, 29]
+byday_dates(2026, 3, parse_byday("-1SU"))  # -> [date(2026, 3, 29)]
 byday_dates(2026, 9, "5MO")  # -> []
 byday_dates(1998, None, "20MO")  # -> [date(1998, 5, 18)]
 nth_weekday_in_year(2026, MONDAY, -1)  # -> date(2026, 12, 28)
@@ -117,11 +119,12 @@ input. `python -m nthweekday` works the same.
 - Every (year, month, weekday, n) from 1990 to 2040, the year ordinals 1 to 53 at the
   calendar limits, and random BYDAY lists are compared with `python-dateutil`'s `rrule`,
   used only in the tests.
-- The worked examples of RFC 5545 are test vectors.
+- Selected worked examples of RFC 5545 (the BYDAY ordinal ones) are test vectors.
 - The six US federal holidays defined by a weekday rule in 5 U.S.C. 6103 reproduce every
-  date OPM published for 2011 to 2030, and the UK bank holiday rules of the Banking and
-  Financial Dealings Act 1971 reproduce the GOV.UK dates, apart from the two days moved
-  by proclamation.
+  date OPM published for 2011 to 2030. The UK Monday bank holidays (the late May and
+  August ones from the Banking and Financial Dealings Act 1971, the early May one set
+  each year by proclamation) reproduce the GOV.UK dates, apart from the two days moved
+  by a special proclamation.
 - The upstream pages are not part of the repository: `python scripts/fetch_upstream.py`
   fetches them into `data/upstream/`, checked against the pinned manifest, and the tests
   that need them skip until then.

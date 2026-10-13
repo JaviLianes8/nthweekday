@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import operator
 from datetime import MAXYEAR, MINYEAR, date
 from enum import IntEnum
 
@@ -25,6 +26,10 @@ class Weekday(IntEnum):
     def __repr__(self) -> str:
         return f"Weekday.{self.name}"
 
+    def __str__(self) -> str:
+        # IntEnum changed str() to the number in 3.11; pin one answer on every version.
+        return self.name
+
     @property
     def iso(self) -> int:
         """ISO 8601 number, as ``date.isoweekday()``: Monday is 1, Sunday is 7."""
@@ -38,9 +43,7 @@ class Weekday(IntEnum):
     @classmethod
     def from_iso(cls, number: int) -> Weekday:
         """The weekday with ISO number ``number`` (1 is Monday, 7 is Sunday)."""
-        if not _is_int(number) or not 1 <= number <= 7:
-            raise ValueError(f"ISO weekday must be an int in 1..7, got {number!r}")
-        return cls(number - 1)
+        return cls(_int_in("ISO weekday", number, 1, 7) - 1)
 
     @classmethod
     def parse(cls, text: str) -> Weekday:
@@ -60,18 +63,23 @@ for _day in Weekday:
     _NAMES[_day.name] = _day
 
 
-def _is_int(value: object) -> bool:
-    # bool is an int subclass; True as a month or weekday is a bug, never intent.
-    return isinstance(value, int) and not isinstance(value, bool)
+def _as_int(name: str, value: object) -> int:
+    # bool is an int subclass; True as a month or weekday is a bug, never intent. Other
+    # integer types (numpy and the like) are welcome through __index__; floats are not.
+    if not isinstance(value, bool):
+        try:
+            return operator.index(value)  # type: ignore[arg-type]
+        except TypeError:
+            pass
+    raise TypeError(f"{name} must be an int, got {type(value).__name__}")
 
 
-def _int_in(name: str, value: object, low: int, high: int) -> int:
-    if not _is_int(value):
-        raise TypeError(f"{name} must be an int, got {type(value).__name__}")
-    assert isinstance(value, int)
-    if not low <= value <= high:
-        raise ValueError(f"{name} must be in {low}..{high}, got {value}")
-    return value
+def _int_in(name: str, value: object, low: int, high: int, *, nonzero: bool = False) -> int:
+    number = _as_int(name, value)
+    if not low <= number <= high or (nonzero and number == 0):
+        span = f"1..{high} or -{high}..-1" if nonzero else f"{low}..{high}"
+        raise ValueError(f"{name} must be in {span}, got {number}")
+    return number
 
 
 def check_year(year: object) -> int:
