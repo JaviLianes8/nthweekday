@@ -82,6 +82,16 @@ def test_byday_validates_its_fields() -> None:
         ByDay(Weekday.MONDAY).ordinal = 1  # type: ignore[misc]
 
 
+def test_byday_normalises_index_integers_to_int() -> None:
+    class Index:
+        def __index__(self) -> int:
+            return 2
+
+    entry = ByDay(Index(), Index())  # type: ignore[arg-type]
+    assert entry == ByDay(Weekday.WEDNESDAY, 2) and str(entry) == "2WE"
+    assert type(entry.ordinal) is int and entry.weekday is Weekday.WEDNESDAY
+
+
 def test_byday_dates_monthly_plain_weekday_is_every_one() -> None:
     assert [d.day for d in byday_dates(2026, 10, "TH")] == [1, 8, 15, 22, 29]
 

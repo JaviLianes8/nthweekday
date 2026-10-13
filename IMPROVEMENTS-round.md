@@ -98,3 +98,21 @@ Considered and left out:
 - Full RRULE expansion (BYSETPOS, INTERVAL, COUNT): that is a recurrence engine; this
   library covers the BYDAY piece that recurrence engines share.
 - Non-Gregorian calendars and years outside 1..9999: `datetime` does not represent them.
+
+## Results
+
+- Gates: `ruff format --check .`, `ruff check .`, `mypy --strict src tests` and `pytest`
+  are green, with the upstream copies fetched (no skips) and without them (the corpus
+  tests skip).
+- Installed-wheel test: the wheel installs into a fresh venv with no runtime
+  dependencies, the `nthweekday` script and `python -m nthweekday` answer as documented,
+  and the sdist carries the manifest but none of the upstream copies.
+- Mutation run: 40 hand-written mutants over every module, `__pycache__` purged before
+  each one and no bytecode written; all 40 make the suite fail. One of them (dropping the
+  CLI reordering of signed BYDAY values) is only caught on Python 3.13 and older, because
+  the 3.14 `argparse` already reads `-1FR` as a positional.
+- Independent review: no wrong dates and no grammar defects; the fixes it led to are
+  accepting a parsed BYDAY list in `byday_dates`, integer types through `__index__`,
+  `TypeError` from `Weekday.from_iso`, a stable `str()` for `Weekday`, clearer range
+  messages, ASCII-only BYDAY entries, direct tests for `nth_weekday_in_year`, RFC vectors
+  tied to their own rule, and an sdist content check. Each has a regression test.
