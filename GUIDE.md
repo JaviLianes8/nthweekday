@@ -31,6 +31,8 @@ Weekday.parse("Thursday")  # -> Weekday.THURSDAY
 or the full English name, in any letter case, and raises `ValueError` for anything else
 (`TypeError` for a non-string). `Weekday(n)` checks `n` as the table below says, so
 `Weekday(True)` and `Weekday(4.0)` raise `TypeError` and `Weekday(7)` raises `ValueError`.
+It takes exactly one argument: anything more (the enum functional API, or a keyword such
+as `module=`) raises `TypeError`.
 
 `str()`, and `format()` without a spec, give the name; `format()` with a spec formats the
 number, so `f"{day:02d}"` gives `04`. Both hold on every supported Python version. To pad

@@ -43,6 +43,16 @@ def test_the_constructor_checks_its_argument_like_every_function() -> None:
     with pytest.raises(ValueError) as caught:
         Weekday(10**5000)
     assert len(str(caught.value)) < 80
+    # Extra arguments are refused before any lookup, so they cannot skip the check.
+    extras: list[Callable[[], object]] = [
+        lambda: Weekday(True, module=None),  # type: ignore[call-arg]
+        lambda: Weekday(4.0, qualname="x"),  # type: ignore[call-arg, arg-type]
+        lambda: Weekday("x" * 10**6, "y"),  # type: ignore[call-arg, arg-type]
+    ]
+    for call in extras:
+        with pytest.raises(TypeError) as refused:
+            call()
+        assert str(refused.value) == "Weekday() takes one argument, the weekday number"
 
 
 def test_byday_takes_an_int_weekday_and_stores_a_weekday() -> None:
@@ -52,14 +62,16 @@ def test_byday_takes_an_int_weekday_and_stores_a_weekday() -> None:
     assert ByDay(4) == ByDay(FRIDAY) and hash(ByDay(4, 1)) == hash(ByDay(FRIDAY, 1))
 
 
-def _numpy_like_bool() -> object:
-    # numpy 1.x bool scalars have __index__, so only their type tells them apart.
-    fake = type("bool_", (), {"__module__": "numpy", "__index__": lambda self: 1})
+def _numpy_like_bool(name: str) -> object:
+    # numpy 1.x bool scalars have __index__, so only their type tells them apart; the type
+    # is named bool_ before numpy 2.0 and bool after.
+    fake = type(name, (), {"__module__": "numpy", "__index__": lambda self: 1})
     return fake()
 
 
-def test_numpy_bool_scalars_are_refused_like_bool() -> None:
-    flag = _numpy_like_bool()
+@pytest.mark.parametrize("name", ["bool_", "bool"])
+def test_numpy_bool_scalars_are_refused_like_bool(name: str) -> None:
+    flag = _numpy_like_bool(name)
     calls: list[Callable[[], object]] = [
         lambda: nth_weekday(2026, flag, 0, 1),  # type: ignore[arg-type]
         lambda: nth_weekday(2026, 1, flag, 1),  # type: ignore[arg-type]
@@ -67,7 +79,7 @@ def test_numpy_bool_scalars_are_refused_like_bool() -> None:
         lambda: Weekday(flag),  # type: ignore[arg-type]
     ]
     for call in calls:
-        with pytest.raises(TypeError, match="must be an int, got bool_"):
+        with pytest.raises(TypeError, match=f"must be an int, got {name}$"):
             call()
 
 
@@ -148,6 +160,17 @@ def test_command_line_errors_quote_at_most_40_characters(
     err = capsys.readouterr().err
     assert stop.value.code == 2 and len(err) < 400, err[:200]
     assert not any(c * 41 in err for c in "xyzqwvut")
+
+
+@pytest.mark.parametrize("length", [41, 42, 60, 80, 81])
+def test_an_option_past_the_quote_limit_is_cut(
+    capsys: pytest.CaptureFixture[str], length: int
+) -> None:
+    value = "q" * (length - len("--yearly="))
+    with pytest.raises(SystemExit) as stop:
+        main(["--yearly=" + value, "2026", "MO"])
+    err = capsys.readouterr().err
+    assert stop.value.code == 2 and value not in err and f"({length} characters)" in err
 
 
 def test_public_classes_keep_their_source_and_functions_report_the_package() -> None:

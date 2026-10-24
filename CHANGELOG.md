@@ -40,6 +40,8 @@ release on. 0.2.0 was never published to PyPI, so 1.0.0 is the first release the
 - `Weekday(n)` checks `n` as the functions do: `bool`, `float` and `str` raise
   `TypeError` (`Weekday(True)` gave `Weekday.TUESDAY` and `Weekday(4.0)` gave
   `Weekday.FRIDAY`), and an integer out of range raises `ValueError` naming 0..6.
+  It takes exactly one argument: extra positional or keyword arguments raise
+  `TypeError`, so no form of the call skips the check or repeats a long text.
 - `format()` of a `Weekday` follows one rule on every Python version: the name without a
   spec, the number with one (`f"{FRIDAY:02d}"` is `04`). On Python 3.10 a spec used to
   format the name, and `d` raised `ValueError`.

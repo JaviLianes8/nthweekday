@@ -15,9 +15,11 @@ _QUOTE_LIMIT = 40
 class _CheckedEnumType(EnumMeta):
     def __call__(cls, value: Any, *args: Any, **kwargs: Any) -> Any:
         # A lookup by value matches True and 4.0 too, as they equal 1 and 4; check it first
-        # so that Weekday(x) refuses what every function refuses.
+        # so that Weekday(x) refuses what every function refuses. Extra arguments belong to
+        # the functional API, which cannot extend an enum with members; a keyword alone
+        # (module=, qualname=) would turn the call back into an unchecked lookup.
         if args or kwargs:
-            return super().__call__(value, *args, **kwargs)
+            raise TypeError("Weekday() takes one argument, the weekday number")
         return super().__call__(_int_in("weekday", value, 0, 6))
 
 
