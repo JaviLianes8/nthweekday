@@ -1,4 +1,5 @@
-"""python-dateutil's rrule as an independent oracle; it is a test-only dependency."""
+"""Independent oracles: python-dateutil's rrule (a test-only dependency) and the rows of the
+standard calendar module."""
 
 from __future__ import annotations
 
@@ -75,8 +76,8 @@ def test_yearly_ordinals_match_rrule(year: int) -> None:
 def test_random_byday_lists_match_the_union_of_rrule_entries(seed: int) -> None:
     # dateutil intersects plain and numbered weekdays given together ("FR,1FR" yields only
     # the first Friday) while RFC 5545 BYDAY is one list, so each entry is asked alone and
-    # the answers are merged. dateutil also fails on monthly ordinals above 5, so those are
-    # covered by test_monthly_ordinals_past_five_select_nothing instead.
+    # the answers are merged. dateutil raises IndexError for some monthly ordinals above 5
+    # (20MO), so those are covered by test_monthly_ordinals_past_five_select_nothing.
     rng = random.Random(seed)
     year = rng.choice([1, 1700, 1999, 2024, 2026, 9999])
     month = rng.choice([None, *range(1, 13)])
@@ -98,3 +99,26 @@ def test_monthly_ordinals_past_five_select_nothing() -> None:
     for n in (6, 7, 30, 53):
         assert byday_dates(2026, 10, f"{n}TH") == []
         assert byday_dates(2026, 10, f"-{n}TH") == []
+
+
+# The Gregorian calendar repeats every 400 years, so one whole cycle covers every month
+# layout; the first and last centuries add the limits of datetime.
+CYCLE_YEARS = [*range(2000, 2400), *range(1, 101), *range(9900, 10000)]
+
+
+@pytest.mark.parametrize("chunk", range(0, len(CYCLE_YEARS), 50))
+def test_every_month_layout_matches_the_calendar_module(chunk: int) -> None:
+    cal = calendar.Calendar()
+    for year in CYCLE_YEARS[chunk : chunk + 50]:
+        for month in range(1, 13):
+            rows = [(d, wd) for d, wd in cal.itermonthdays2(year, month) if d]
+            for day in range(7):
+                expected = [date(year, month, d) for d, wd in rows if wd == day]
+                assert weekdays_in_month(year, month, day) == expected
+                for n in (1, 2, 3, 4, 5, -1, -2, -3, -4, -5):
+                    index = n - 1 if n > 0 else len(expected) + n
+                    try:
+                        got = [nth_weekday(year, month, day, n)]
+                    except NoSuchDayError:
+                        got = []
+                    assert got == ([expected[index]] if 0 <= index < len(expected) else [])

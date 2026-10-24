@@ -7,12 +7,21 @@ from datetime import MAXYEAR, MINYEAR, date
 from enum import IntEnum
 
 _CODES = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
+# Error messages quote at most this many characters of what the caller passed.
+_QUOTE_LIMIT = 40
 
 
 class Weekday(IntEnum):
     """A day of the week numbered like ``date.weekday()``: Monday is 0, Sunday is 6.
 
     Members are plain ints, so they work anywhere a ``date.weekday()`` value does.
+
+    >>> Weekday.FRIDAY == 4
+    True
+    >>> Weekday(6)
+    Weekday.SUNDAY
+    >>> str(Weekday.MONDAY)
+    'MONDAY'
     """
 
     MONDAY = 0
@@ -32,27 +41,47 @@ class Weekday(IntEnum):
 
     @property
     def iso(self) -> int:
-        """ISO 8601 number, as ``date.isoweekday()``: Monday is 1, Sunday is 7."""
+        """ISO 8601 number, as ``date.isoweekday()``: Monday is 1, Sunday is 7.
+
+        >>> Weekday.SUNDAY.iso
+        7
+        """
         return self.value + 1
 
     @property
     def code(self) -> str:
-        """The two-letter RFC 5545 code, such as ``MO``."""
+        """The two-letter RFC 5545 code.
+
+        >>> Weekday.THURSDAY.code
+        'TH'
+        """
         return _CODES[self.value]
 
     @classmethod
     def from_iso(cls, number: int) -> Weekday:
-        """The weekday with ISO number ``number`` (1 is Monday, 7 is Sunday)."""
+        """The weekday with ISO number ``number`` (1 is Monday, 7 is Sunday).
+
+        >>> Weekday.from_iso(1)
+        Weekday.MONDAY
+        """
         return cls(_int_in("ISO weekday", number, 1, 7) - 1)
 
     @classmethod
     def parse(cls, text: str) -> Weekday:
-        """Read a weekday from ``MO``, ``Mon`` or ``Monday``, in any letter case."""
+        """Read a weekday from ``MO``, ``Mon`` or ``Monday``, in any letter case.
+
+        Raises ``ValueError`` for any other text and ``TypeError`` for a non-string.
+
+        >>> Weekday.parse("fri")
+        Weekday.FRIDAY
+        >>> Weekday.parse("SU")
+        Weekday.SUNDAY
+        """
         if not isinstance(text, str):
             raise TypeError(f"weekday name must be a str, got {type(text).__name__}")
         found = _NAMES.get(text.upper()) if text.isascii() else None
         if found is None:
-            raise ValueError(f"unknown weekday name {text!r}")
+            raise ValueError(f"unknown weekday name {quote(text)}")
         return found
 
 
@@ -61,6 +90,24 @@ for _day in Weekday:
     _NAMES[_day.code] = _day
     _NAMES[_day.name[:3]] = _day
     _NAMES[_day.name] = _day
+
+
+def quote(text: str) -> str:
+    """``repr(text)``, cut to a bounded length so a huge argument never floods a message."""
+    shown = len(text)
+    # Escaped characters make a repr up to ten times longer than the text it shows.
+    while shown > _QUOTE_LIMIT or len(repr(text[:shown])) > 2 * _QUOTE_LIMIT + 2:
+        shown = min(shown, _QUOTE_LIMIT + 1) - 1
+    if shown == len(text):
+        return repr(text)
+    return f"{text[:shown]!r}... ({len(text)} characters)"
+
+
+def _shown(number: int) -> str:
+    # str() of a huge int is slow and, since 3.11, refused past 4300 digits.
+    if abs(number) < 10**18:
+        return str(number)
+    return f"an integer of {number.bit_length()} bits"
 
 
 def _as_int(name: str, value: object) -> int:
@@ -78,7 +125,7 @@ def _int_in(name: str, value: object, low: int, high: int, *, nonzero: bool = Fa
     number = _as_int(name, value)
     if not low <= number <= high or (nonzero and number == 0):
         span = f"1..{high} or -{high}..-1" if nonzero else f"{low}..{high}"
-        raise ValueError(f"{name} must be in {span}, got {number}")
+        raise ValueError(f"{name} must be in {span}, got {_shown(number)}")
     return number
 
 

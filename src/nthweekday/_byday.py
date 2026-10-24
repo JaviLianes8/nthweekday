@@ -9,8 +9,9 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from ._month import NoSuchDayError, nth_weekday_in_year
-from ._weekday import Weekday, _int_in, check_month, check_weekday, check_year
+from ._weekday import Weekday, _int_in, check_month, check_weekday, check_year, quote
 
+_VALUE_TYPES = "value must be a BYDAY string, a ByDay or ByDay entries"
 # weekdaynum = [[plus / minus] ordwk] weekday, ordwk = 1*2DIGIT (1 to 53), RFC 5545 3.3.10.
 # Enumerated values are case-insensitive (RFC 5545 section 2), so the code is matched as such.
 _WEEKDAYNUM = re.compile(r"(?:([+-]?)([0-9]{1,2}))?(SU|MO|TU|WE|TH|FR|SA)", re.IGNORECASE)
@@ -21,7 +22,15 @@ class ByDay:
     """One BYDAY entry: a weekday, optionally with an ordinal (``-1FR`` is the last Friday).
 
     ``ordinal`` is ``None`` for every such weekday in the period, or 1..53 / -53..-1.
-    ``str()`` gives the canonical RFC 5545 form.
+    ``str()`` gives the canonical RFC 5545 form. Frozen and hashable.
+
+    >>> from nthweekday import FRIDAY
+    >>> ByDay(FRIDAY, -1)
+    ByDay(Weekday.FRIDAY, -1)
+    >>> str(ByDay(FRIDAY, -1))
+    '-1FR'
+    >>> str(ByDay(FRIDAY))
+    'FR'
     """
 
     weekday: Weekday
@@ -45,7 +54,13 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
     """Parse a BYDAY value such as ``"1SU,-1SU"`` into ``ByDay`` entries, in order.
 
     Accepts exactly the RFC 5545 grammar: an optional sign and one or two digits for 1..53,
-    then a two-letter code. Raises ``ValueError`` on anything else, including spaces.
+    then a two-letter code, in any letter case. Raises ``ValueError`` on anything else,
+    including spaces and an empty value, and ``TypeError`` for a non-string.
+
+    >>> parse_byday("1SU,-1SU")
+    (ByDay(Weekday.SUNDAY, 1), ByDay(Weekday.SUNDAY, -1))
+    >>> parse_byday("+02mo")
+    (ByDay(Weekday.MONDAY, 2),)
     """
     if not isinstance(value, str):
         raise TypeError(f"BYDAY value must be a str, got {type(value).__name__}")
@@ -54,11 +69,11 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
         # IGNORECASE folds some non-ASCII letters into codes (long s matches S).
         match = _WEEKDAYNUM.fullmatch(item) if item.isascii() else None
         if match is None:
-            raise ValueError(f"invalid BYDAY entry {item!r} in {value!r}")
+            raise ValueError(f"invalid BYDAY entry {quote(item)} in {quote(value)}")
         sign, digits, code = match.groups()
         ordinal = None if digits is None else int(sign + digits)
         if ordinal is not None and not 1 <= abs(ordinal) <= 53:
-            raise ValueError(f"BYDAY ordinal must be 1..53, got {item!r}")
+            raise ValueError(f"BYDAY ordinal must be 1..53, got {quote(item)}")
         entries.append(ByDay(Weekday.parse(code), ordinal))
     return tuple(entries)
 
@@ -70,7 +85,15 @@ def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDa
     and an ordinal past the last occurrence selects nothing. With ``month=None`` it is the
     YEARLY meaning without BYMONTH: ``20MO`` is the twentieth Monday of the year.
     ``value`` is a BYDAY string, one ``ByDay`` or several (what ``parse_byday`` returns).
-    The result is sorted and has no duplicates.
+    The result is sorted and has no duplicates. Raises ``ValueError`` for a bad year,
+    month or BYDAY string and ``TypeError`` for arguments of the wrong type.
+
+    >>> [d.day for d in byday_dates(2026, 3, "1SU,-1SU")]
+    [1, 29]
+    >>> byday_dates(2026, 9, "5MO")
+    []
+    >>> byday_dates(1998, None, "20MO")
+    [datetime.date(1998, 5, 18)]
     """
     year = check_year(year)
     if month is not None:
@@ -80,9 +103,12 @@ def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDa
     elif isinstance(value, ByDay):
         entries = (value,)
     else:
-        entries = tuple(value)
+        try:
+            entries = tuple(value)
+        except TypeError:
+            raise TypeError(_VALUE_TYPES) from None
         if not all(isinstance(e, ByDay) for e in entries):
-            raise TypeError("value must be a BYDAY string, a ByDay or ByDay entries")
+            raise TypeError(_VALUE_TYPES)
     if month is None:
         start, end = date(year, 1, 1), date(year, 12, 31)
     else:

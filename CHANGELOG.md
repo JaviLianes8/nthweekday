@@ -6,6 +6,43 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-24
+
+The public API is now stable: the twenty names in `nthweekday.__all__`, their parameter
+names, defaults, return types and error types follow Semantic Versioning from this
+release on. 0.2.0 was never published to PyPI, so 1.0.0 is the first release there.
+
+### Stable
+
+- Month queries: `nth_weekday`, `last_weekday` and `weekdays_in_month`.
+- Year queries: `nth_weekday_in_year`, counted as RFC 5545 counts BYDAY in a YEARLY rule.
+- Date queries: `ordinal_of`, `week_of_month`, `next_weekday` and `previous_weekday`.
+- RFC 5545 BYDAY: `parse_byday`, `ByDay` and `byday_dates`.
+- Weekdays: `Weekday` and the `MONDAY` to `SUNDAY` constants.
+- Errors: `NoSuchDayError` (a `ValueError`) when the day does not exist, `ValueError`
+  for an argument out of range or invalid text, `TypeError` for the wrong type.
+- The `nthweekday` command line tool and `python -m nthweekday`, with exit codes 0, 1
+  and 2.
+
+### Changed
+
+- `next_weekday` and `previous_weekday` raise `NoSuchDayError` instead of a plain
+  `ValueError` when the answer would fall outside the years 1 to 9999. Code that catches
+  `ValueError` is unaffected.
+- `byday_dates` raises `TypeError` with its own message for a value that is neither a
+  string, a `ByDay` nor an iterable (it let the error of `tuple()` through).
+- Error messages quote at most 40 characters of a text argument and describe a huge
+  integer by its size instead of printing it; before, a long BYDAY value or weekday name
+  was repeated in full, and an integer past 4300 digits failed while building the message.
+- The command line quotes the BYDAY value when it selects no date.
+- The classes and functions report `nthweekday` as their module, so pickles of `Weekday`
+  and `ByDay` refer to `nthweekday.Weekday` and `nthweekday.ByDay`.
+
+### Added
+
+- Every public name has a docstring with an example that runs as a test.
+- A GUIDE describing every public name, the argument checks and the errors.
+
 ## [0.2.0]
 
 ### Added

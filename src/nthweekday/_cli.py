@@ -8,6 +8,7 @@ import sys
 from collections.abc import Sequence
 
 from ._byday import byday_dates
+from ._weekday import quote
 
 _PERIOD = re.compile(r"([0-9]{4})(?:-([0-9]{2}))?")
 _SIGNED = re.compile(r"[+-][0-9]")
@@ -44,7 +45,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     opts = parser.parse_args(args)
     period = _PERIOD.fullmatch(opts.period)
     if period is None:
-        parser.error(f"period must be YYYY or YYYY-MM, got {opts.period!r}")
+        parser.error(f"period must be YYYY or YYYY-MM, got {quote(opts.period)}")
     year, month = int(period[1]), period[2]
     if opts.yearly and month is not None:
         parser.error("--yearly takes a bare year, not YYYY-MM")
@@ -57,7 +58,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         parser.error(str(exc))
     if not found:
-        print(f"nthweekday: {opts.byday} selects no date in {opts.period}", file=sys.stderr)
+        print(f"nthweekday: {quote(opts.byday)} selects no date in {opts.period}", file=sys.stderr)
         return 1
     sys.stdout.write("".join(f"{d.isoformat()}\n" for d in found))
     return 0
