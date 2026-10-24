@@ -57,6 +57,7 @@ include = [
     "GUIDE.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
+    "requirements-dev.txt",
     "LICENSE",
 ]
 

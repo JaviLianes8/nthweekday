@@ -45,14 +45,40 @@ def test_docs_use_only_public_names() -> None:
         assert not re.search(r"nthweekday\._[a-z]|from \._", text), name
 
 
+# Every docstring with an example; the classes keep their defining module (so that
+# inspect.getsource finds them), so their examples are collected from the classes.
+DOCTESTS = {
+    "ByDay": 4,
+    "NoSuchDayError": 2,
+    "Weekday": 4,
+    "Weekday.code": 1,
+    "Weekday.from_iso": 1,
+    "Weekday.iso": 1,
+    "Weekday.parse": 2,
+    "byday_dates": 3,
+    "last_weekday": 2,
+    "next_weekday": 4,
+    "nth_weekday": 3,
+    "nth_weekday_in_year": 3,
+    "ordinal_of": 3,
+    "parse_byday": 2,
+    "previous_weekday": 3,
+    "week_of_month": 4,
+    "weekdays_in_month": 2,
+}
+
+
 def test_every_public_name_has_a_docstring_example_that_passes() -> None:
-    tests = [t for t in doctest.DocTestFinder().find(nthweekday) if t.examples]
-    named = {t.name.removeprefix("nthweekday.").split(".")[0] for t in tests}
+    finder = doctest.DocTestFinder()
+    tests = finder.find(nthweekday)
+    for name in ("ByDay", "NoSuchDayError", "Weekday"):
+        tests += finder.find(getattr(nthweekday, name))
+    found = {t.name.removeprefix("nthweekday."): len(t.examples) for t in tests if t.examples}
+    assert found == DOCTESTS
     constants = {name for name in nthweekday.__all__ if name.isupper()}
     # The day constants are Weekday members: their examples are those of Weekday.
-    assert named == set(nthweekday.__all__) - constants
+    assert {name.split(".")[0] for name in found} == set(nthweekday.__all__) - constants
     runner = doctest.DocTestRunner(optionflags=doctest.ELLIPSIS)
     for test in tests:
         runner.run(test)
-    assert runner.summarize(verbose=False).failed == 0
-    assert runner.summarize(verbose=False).attempted >= 40
+    assert runner.summarize(verbose=False) == (0, sum(DOCTESTS.values()))

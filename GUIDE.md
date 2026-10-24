@@ -18,6 +18,8 @@ FRIDAY == 4  # -> True
 date(2026, 10, 23).weekday() == FRIDAY  # -> True
 Weekday(6)  # -> Weekday.SUNDAY
 str(Weekday.MONDAY)  # -> 'MONDAY'
+f"{FRIDAY} is day {FRIDAY:02d}"  # -> 'FRIDAY is day 04'
+f"{MONDAY!s:>8}"  # -> '  MONDAY'
 Weekday.SUNDAY.iso  # -> 7
 Weekday.from_iso(1)  # -> Weekday.MONDAY
 Weekday.THURSDAY.code  # -> 'TH'
@@ -27,7 +29,12 @@ Weekday.parse("Thursday")  # -> Weekday.THURSDAY
 
 `Weekday.parse` reads the two-letter RFC 5545 code, the three-letter English abbreviation
 or the full English name, in any letter case, and raises `ValueError` for anything else
-(`TypeError` for a non-string). `str()` gives the name on every Python version.
+(`TypeError` for a non-string). `Weekday(n)` checks `n` as the table below says, so
+`Weekday(True)` and `Weekday(4.0)` raise `TypeError` and `Weekday(7)` raises `ValueError`.
+
+`str()`, and `format()` without a spec, give the name; `format()` with a spec formats the
+number, so `f"{day:02d}"` gives `04`. Both hold on every supported Python version. To pad
+the name, convert it first: `f"{day!s:>8}"`.
 
 ## Argument checks
 
@@ -37,15 +44,17 @@ Every function checks its arguments before it computes anything:
 | --- | --- | --- |
 | `year` | 1 to 9999, the range of `datetime` | `ValueError` |
 | `month` | 1 to 12 | `ValueError` |
-| `weekday`, `first_weekday` | 0 to 6, or a `Weekday` | `ValueError` |
+| `weekday`, `first_weekday`, `Weekday(n)` | 0 to 6, or a `Weekday` | `ValueError` |
 | `n` in a month | 1 to 5 or -5 to -1 | `ValueError` |
 | `n` in a year, `ByDay.ordinal` | 1 to 53 or -53 to -1 | `ValueError` |
 | a date | `datetime.date` or `datetime.datetime` | `TypeError` |
 
 Any integer type is accepted through `__index__` (numpy integers included). `bool`,
 `float` and `str` are refused with `TypeError`, since `True` as a month or `2.0` as an
-ordinal is a bug rather than intent. Error messages quote at most 40 characters of a
-text argument and never print a huge integer in full.
+ordinal is a bug rather than intent; numpy's bool scalar counts as a `bool`. A `str`
+subclass is read as its plain text, without calling its own methods. Error messages
+quote at most 40 characters of a text argument, never print a huge integer in full, and
+never repeat the value of an argument of the wrong type.
 
 ## Errors
 
@@ -129,6 +138,7 @@ parse_byday("1SU,-1SU")  # -> (ByDay(Weekday.SUNDAY, 1), ByDay(Weekday.SUNDAY, -
 parse_byday("+02mo")  # -> (ByDay(Weekday.MONDAY, 2),)
 str(ByDay(FRIDAY, -1))  # -> '-1FR'
 str(ByDay(FRIDAY))  # -> 'FR'
+ByDay(date(2026, 10, 23).weekday(), -1)  # -> ByDay(Weekday.FRIDAY, -1)
 [d.day for d in byday_dates(2026, 3, "1SU,-1SU")]  # -> [1, 29]
 [d.day for d in byday_dates(2026, 10, "FR,1FR")]  # -> [2, 9, 16, 23, 30]
 byday_dates(2026, 9, "5MO")  # -> []
@@ -142,8 +152,9 @@ from 1 to 53, then one of `SU`, `MO`, `TU`, `WE`, `TH`, `FR`, `SA` in any letter
 Spaces, empty entries, `0`, three digits and non-ASCII look-alike characters raise
 `ValueError`. It returns the entries in order, as a tuple of `ByDay`.
 
-`ByDay(weekday, ordinal=None)` is a frozen, hashable dataclass; it checks both fields as
-in the table above and stores a `Weekday` and an `int`. `str()` writes the canonical
+`ByDay(weekday, ordinal=None)` is a frozen, hashable dataclass. `weekday` is typed `int`,
+so a `date.weekday()` value or a `Weekday` both type-check; it checks both fields as in
+the table above and stores a `Weekday` and an `int`. `str()` writes the canonical
 form (no `+`, no leading zero, upper case), which `parse_byday` reads back to an equal
 value.
 
@@ -170,12 +181,14 @@ nthweekday --yearly 1998 20MO     # ordinals counted within the year
 
 A signed value such as `-1FR` is never taken for an option. It exits 0 when it printed
 dates, 1 when the value selects nothing in that period, and 2 on bad input, with the
-reason on standard error.
+reason on standard error. That reason quotes at most 40 characters of any argument.
 
 ## Stability
 
 From 1.0.0 on, the names in `nthweekday.__all__`, their parameter names, defaults,
-return types and error types follow Semantic Versioning. The classes and functions report
-`nthweekday` as their module, so pickles never refer to the private modules behind them.
+return types and error types follow Semantic Versioning. The functions report
+`nthweekday` as their module. `Weekday`, `ByDay` and `NoSuchDayError` report the module
+that defines them, so that `inspect.getsource` and debuggers find their code; pickles of
+them name that module, and it stays importable under that name in every 1.x release.
 Messages of errors are for people and may be reworded in a minor release; their types
 will not change.

@@ -27,6 +27,8 @@ day: date = nth_weekday(2026, 11, THURSDAY, 4)
 days: list[date] = byday_dates(2026, 3, "1SU,-1SU")
 entries: tuple[ByDay, ...] = parse_byday("-1FR")
 weekday: Weekday = entries[0].weekday
+last_friday: ByDay = ByDay(date(2026, 10, 23).weekday(), -1)
+assert last_friday == entries[0]
 print(day, [d.day for d in days], entries[0])
 """
 
@@ -80,10 +82,11 @@ def test_wheel_installs_and_the_script_works(tmp_path: Path) -> None:
     assert done.returncode == 0 and done.stdout.splitlines()[-1] == "2026-12-25"
     done = _run([str(python), "-m", "nthweekday", "--yearly", "1998", "20MO"])
     assert (done.returncode, done.stdout) == (0, "1998-05-18\n")
-    done = _run([str(script), "2026-09", "5MO"])
-    assert (done.returncode, done.stdout) == (1, "")
-    done = _run([str(script), "2026-13", "MO"])
-    assert done.returncode == 2 and "month must be in 1..12" in done.stderr
+    for command in ([str(script)], [str(python), "-m", "nthweekday"]):
+        done = _run([*command, "2026-09", "5MO"])
+        assert (done.returncode, done.stdout) == (1, ""), command
+        done = _run([*command, "2026-13", "MO"])
+        assert done.returncode == 2 and "month must be in 1..12" in done.stderr, command
     version = _run([str(script), "--version"])
     assert version.stdout.strip() == f"nthweekday {nthweekday.__version__}"
 
@@ -131,7 +134,9 @@ def test_sdist_ships_the_manifest_but_no_upstream_copies(tmp_path: Path) -> None
     assert "data/upstream/MANIFEST.json" in names
     assert "scripts/fetch_upstream.py" in names and "tests/conftest.py" in names
     assert [n for n in names if n.startswith("data/")] == ["data/upstream/MANIFEST.json"]
-    for doc in ("README.md", "GUIDE.md", "CHANGELOG.md", "LICENSE", "src/nthweekday/py.typed"):
+    # CONTRIBUTING tells readers to install requirements-dev.txt, so it ships too.
+    shipped = ("README.md", "GUIDE.md", "CHANGELOG.md", "CONTRIBUTING.md", "requirements-dev.txt")
+    for doc in (*shipped, "LICENSE", "src/nthweekday/py.typed"):
         assert doc in names
     assert not [n for n in names if n.startswith(("IMPROVEMENTS", "CERT-", ".git/", ".github"))]
     assert not [n for n in names if "__pycache__" in n or n.endswith(".pyc")]

@@ -52,7 +52,7 @@ def test_function_signatures_are_pinned(name: str) -> None:
 
 def test_class_signatures_are_pinned() -> None:
     assert str(inspect.signature(ByDay)) == (
-        "(weekday: 'Weekday', ordinal: 'int | None' = None) -> None"
+        "(weekday: 'int', ordinal: 'int | None' = None) -> 'None'"
     )
     assert [(m.name, m.value) for m in Weekday] == [
         ("MONDAY", 0),
@@ -67,14 +67,15 @@ def test_class_signatures_are_pinned() -> None:
     assert str(inspect.signature(Weekday.from_iso)) == "(number: 'int') -> 'Weekday'"
 
 
-def test_public_names_report_the_package_as_their_module() -> None:
+def test_functions_report_the_package_and_classes_their_defining_module() -> None:
+    classes = {"ByDay": "_byday", "NoSuchDayError": "_month", "Weekday": "_weekday"}
     for name in nthweekday.__all__:
         if not name.isupper():
-            assert getattr(nthweekday, name).__module__ == "nthweekday", name
-    for value in (Weekday.MONDAY, ByDay(FRIDAY, -1), NoSuchDayError("x")):
-        dumped = pickle.dumps(value)
-        assert b"nthweekday._" not in dumped
-        assert repr(pickle.loads(dumped)) == repr(value)
+            module = f"nthweekday.{classes[name]}" if name in classes else "nthweekday"
+            assert getattr(nthweekday, name).__module__ == module, name
+    for function in (nth_weekday, parse_byday):
+        assert pickle.loads(pickle.dumps(function)) is function
+        assert b"nthweekday._" not in pickle.dumps(function)
 
 
 def test_the_package_keeps_no_helper_names_from_its_setup() -> None:
@@ -90,7 +91,7 @@ def test_return_types_are_plain() -> None:
     assert type(parse_byday("MO")) is tuple
     assert type(ordinal_of(date(2026, 1, 5))) is int
     assert type(week_of_month(date(2026, 1, 5))) is int
-    assert type(ByDay(1, 2).ordinal) is int and type(ByDay(1).weekday) is Weekday  # type: ignore[arg-type]
+    assert type(ByDay(1, 2).ordinal) is int and type(ByDay(1).weekday) is Weekday
 
 
 def test_absent_days_raise_no_such_day_error_and_nothing_else() -> None:

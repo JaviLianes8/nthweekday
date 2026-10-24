@@ -17,11 +17,12 @@ _VALUE_TYPES = "value must be a BYDAY string, a ByDay or ByDay entries"
 _WEEKDAYNUM = re.compile(r"(?:([+-]?)([0-9]{1,2}))?(SU|MO|TU|WE|TH|FR|SA)", re.IGNORECASE)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class ByDay:
     """One BYDAY entry: a weekday, optionally with an ordinal (``-1FR`` is the last Friday).
 
-    ``ordinal`` is ``None`` for every such weekday in the period, or 1..53 / -53..-1.
+    ``weekday`` is 0..6 or a ``Weekday`` and is stored as a ``Weekday``. ``ordinal`` is
+    ``None`` for every such weekday in the period, or 1..53 / -53..-1.
     ``str()`` gives the canonical RFC 5545 form. Frozen and hashable.
 
     >>> from nthweekday import FRIDAY
@@ -36,11 +37,12 @@ class ByDay:
     weekday: Weekday
     ordinal: int | None = None
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "weekday", check_weekday(self.weekday))
-        if self.ordinal is not None:
-            ordinal = _int_in("ordinal", self.ordinal, -53, 53, nonzero=True)
-            object.__setattr__(self, "ordinal", ordinal)
+    def __init__(self, weekday: int, ordinal: int | None = None) -> None:
+        # Written out so that an int weekday type-checks while the field stays a Weekday.
+        object.__setattr__(self, "weekday", check_weekday(weekday))
+        if ordinal is not None:
+            ordinal = _int_in("ordinal", ordinal, -53, 53, nonzero=True)
+        object.__setattr__(self, "ordinal", ordinal)
 
     def __repr__(self) -> str:
         tail = "" if self.ordinal is None else f", {self.ordinal}"
@@ -64,6 +66,7 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
     """
     if not isinstance(value, str):
         raise TypeError(f"BYDAY value must be a str, got {type(value).__name__}")
+    value = str.__str__(value)  # a str subclass is read as its plain text
     entries = []
     for item in value.split(","):
         # IGNORECASE folds some non-ASCII letters into codes (long s matches S).

@@ -8,7 +8,7 @@ import sys
 from collections.abc import Sequence
 
 from ._byday import byday_dates
-from ._weekday import quote
+from ._weekday import _QUOTE_LIMIT, quote
 
 _PERIOD = re.compile(r"([0-9]{4})(?:-([0-9]{2}))?")
 _SIGNED = re.compile(r"[+-][0-9]")
@@ -42,7 +42,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         flags = [a for a in args if a.startswith("-") and not _SIGNED.match(a)]
         args = [*flags, "--", *(a for a in args if a not in flags)]
     parser = _parser()
-    opts = parser.parse_args(args)
+    # argparse repeats an option it cannot read in full; no option is longer than 40.
+    for arg in args[: args.index("--")] if "--" in args else args:
+        if arg.startswith("-") and len(arg) > _QUOTE_LIMIT and not _SIGNED.match(arg):
+            parser.error(f"unrecognized option {quote(arg)}")
+    opts, extra = parser.parse_known_args(args)
+    if extra:
+        parser.error(f"unrecognized arguments: {quote(' '.join(extra))}")
     period = _PERIOD.fullmatch(opts.period)
     if period is None:
         parser.error(f"period must be YYYY or YYYY-MM, got {quote(opts.period)}")

@@ -70,10 +70,10 @@ def test_str_normalises_sign_and_padding_and_case() -> None:
 
 
 def test_byday_validates_its_fields() -> None:
-    assert ByDay(4, -1).weekday is Weekday.FRIDAY  # type: ignore[arg-type]
+    assert ByDay(4, -1).weekday is Weekday.FRIDAY
     for weekday, ordinal in [(7, None), (-1, None), (0, 0), (0, 54), (0, -54)]:
         with pytest.raises(ValueError):
-            ByDay(weekday, ordinal)  # type: ignore[arg-type]
+            ByDay(weekday, ordinal)
     bad_types: list[tuple[object, object]] = [(True, None), (0, True), (0.0, None), (0, 1.0)]
     for weekday_value, ordinal_value in bad_types:
         with pytest.raises(TypeError):

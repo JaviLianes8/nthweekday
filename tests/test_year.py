@@ -53,3 +53,12 @@ def test_ordinal_words_use_the_right_suffix() -> None:
         53: "53rd",
     }
     assert _ordinal_words(-2) == "second-to-last"
+
+
+def test_years_below_1000_are_padded_to_four_digits_in_messages() -> None:
+    from nthweekday import NoSuchDayError, nth_weekday
+
+    with pytest.raises(NoSuchDayError, match=r"^0002 has no 53rd Monday$"):
+        nth_weekday_in_year(2, MONDAY, 53)
+    with pytest.raises(NoSuchDayError, match=r"^0002-02 has no fifth Monday$"):
+        nth_weekday(2, 2, MONDAY, 5)

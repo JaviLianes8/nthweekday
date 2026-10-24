@@ -23,12 +23,9 @@ SUNDAY = Weekday.SUNDAY
 
 __version__ = "1.0.0"
 
-# Public names show and pickle as nthweekday.<name>, so a pickle never depends on the
-# private module that defines them, and doctest finds every example from the package.
-for _obj in (
-    ByDay,
-    NoSuchDayError,
-    Weekday,
+# The functions show and pickle as nthweekday.<name> and doctest finds them from the
+# package. The classes keep the module that defines them, where inspect.getsource looks.
+for _func in (
     byday_dates,
     last_weekday,
     next_weekday,
@@ -40,12 +37,8 @@ for _obj in (
     week_of_month,
     weekdays_in_month,
 ):
-    _obj.__module__ = __name__
-    for _member in vars(_obj).values() if isinstance(_obj, type) else ():
-        _func = getattr(_member, "__func__", _member)
-        if callable(_func) and str(getattr(_func, "__module__", "")).startswith(f"{__name__}._"):
-            _func.__module__ = __name__
-del _obj, _member, _func
+    _func.__module__ = __name__
+del _func
 
 __all__ = [
     "FRIDAY",
