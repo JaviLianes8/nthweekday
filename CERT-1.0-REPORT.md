@@ -1,9 +1,9 @@
 # nthweekday 1.0.0 certification report
 
 The 1.0.0 certification bar (19 items) applied to nthweekday. PyPI has no release of
-the name (`https://pypi.org/pypi/nthweekday/json` answered 404 on 2026-10-24), so 1.0.0
-is the first upload and there is no upgrade path to check; every change is listed
-against 0.2.0 on `main` (5adde42).
+the name (`https://pypi.org/pypi/nthweekday/json` answered 404 on 2026-10-24 and again
+on 2026-10-25), so 1.0.0 is the first upload and there is no upgrade path to check;
+every change is listed against 0.2.0 on `main` (5adde42).
 
 Progress:
 - [x] Branch `release/1.0.0` created from `main` (5adde42)
@@ -18,6 +18,7 @@ Progress:
 - [x] PR and trace guard
 - [x] QA lenses round 1: every finding fixed (fcbfc64 and the report commit)
 - [x] Author follow-up: three more surviving mutants closed, one defect fixed (d89a99f)
+- [x] Resumed 2026-10-25: PyPI re-checked (404), CHANGELOG dated 2026-10-25, gates re-run
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -36,7 +37,7 @@ Progress:
 | 9 | Seeded fuzz, no crash, hang or blowup | PASS: `tests/test_fuzz.py` |
 | 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (424 passed, numpy test skipped, each; author follow-up); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
 | 11 | README and `twine check` | PASS: `twine check --strict` on wheel and sdist, absolute links, badge |
-| 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-24 |
+| 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-25 |
 | 13 | pyproject 1.0.0, Production/Stable | PASS |
 | 14 | sdist and wheel contents | PASS |
 | 15 | Gates each exit 0 | PASS: see Gates |

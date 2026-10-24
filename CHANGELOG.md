@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-10-24
+## [1.0.0] - 2026-10-25
 
 The public API is now stable: the twenty names in `nthweekday.__all__`, their parameter
 names, defaults, return types and error types follow Semantic Versioning from this
