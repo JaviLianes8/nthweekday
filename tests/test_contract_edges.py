@@ -23,6 +23,7 @@ from nthweekday import (
     parse_byday,
 )
 from nthweekday._cli import main
+from nthweekday._weekday import quote
 
 
 def test_format_gives_the_name_without_a_spec_and_formats_the_number_with_one() -> None:
@@ -99,6 +100,8 @@ def test_str_subclasses_are_read_as_plain_strings() -> None:
         with pytest.raises(ValueError) as caught:
             call()
         assert len(str(caught.value)) < 100
+    # Every message quotes through this helper, whoever calls it.
+    assert quote(_Hostile("XX")) == "'XX'"
 
 
 @pytest.mark.parametrize(

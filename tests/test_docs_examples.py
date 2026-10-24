@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parent.parent
 BLOCK = re.compile(r"```python\n(.*?)```", re.S)
 
 
-@pytest.mark.parametrize(("name", "least"), [("README.md", 20), ("GUIDE.md", 34)])
-def test_documented_results_are_true(name: str, least: int) -> None:
+@pytest.mark.parametrize(("name", "count"), [("README.md", 21), ("GUIDE.md", 37)])
+def test_documented_results_are_true(name: str, count: int) -> None:
     text = (ROOT / name).read_text(encoding="utf-8")
     namespace: dict[str, object] = {}
     checked = 0
@@ -36,7 +36,7 @@ def test_documented_results_are_true(name: str, least: int) -> None:
             else:
                 lines.append(line)
         exec("\n".join(lines), namespace)
-    assert checked >= least
+    assert checked == count
 
 
 def test_docs_use_only_public_names() -> None:

@@ -16,6 +16,7 @@ Progress:
 - [x] Packaging, e2e, every Python (items 8, 10, 13, 14)
 - [x] Gates (item 15)
 - [x] PR and trace guard
+- [x] QA lenses round 1: every finding fixed (fcbfc64 and the report commit)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -25,14 +26,14 @@ Progress:
 | --- | --- | --- |
 | 1 | Public API reviewed for stability | PASS: 20 names kept from 0.2.0; signatures, defaults and return types pinned by `tests/test_contract_api.py`; changes in CHANGELOG |
 | 2 | `__all__` exact, no private imports in docs | PASS: `tests/test_contract.py`, `tests/test_docs_examples.py` |
-| 3 | Docstrings with runnable examples, doctests | PASS: 43 examples in 17 docstrings, found from the package top, every public name covered; README (21) and GUIDE (34) results run as tests |
+| 3 | Docstrings with runnable examples, doctests | PASS: 44 examples in 17 docstrings, pinned exactly, every public name covered; README (21) and GUIDE (37) results run as tests, counts pinned |
 | 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel |
 | 5 | Typed, documented, bounded errors | PASS: `NoSuchDayError` (a `ValueError`), `ValueError`, `TypeError`; messages quote at most 40 characters and never print a huge integer |
 | 6 | Contract tests of every public name | PASS |
 | 7 | Real ground truth | PASS: 5 sources re-fetched 2026-10-24 (hashes unchanged), grammar read from the RFC text, `python-dateutil` and `calendar` oracles |
 | 8 | Real e2e from the wheel | PASS: built wheel in a fresh venv, CLI by subprocess, consumer typing; no PyPI release to upgrade from |
 | 9 | Seeded fuzz, no crash, hang or blowup | PASS: `tests/test_fuzz.py` |
-| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (389 passed each); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
+| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (418 passed, numpy test skipped, each; QA round 1); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
 | 11 | README and `twine check` | PASS: `twine check --strict` on wheel and sdist, absolute links, badge |
 | 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-24 |
 | 13 | pyproject 1.0.0, Production/Stable | PASS |
@@ -162,9 +163,76 @@ killed; the column shows the first failing test.
 
 On this PC with the fetched sources present, each command on its own:
 `ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests`
-and `pytest` (389 passed, the two opt-in e2e tests deselected) exit 0;
+and `pytest` (419 passed after QA round 1, the two opt-in e2e tests deselected) exit 0;
 `pytest -m e2e` 2 passed.
 
 ## QA lenses (item 19) and independent review (item 16)
 
-Pending; run by the maintainer on fresh reviewers after this preparation stage.
+### Round 1
+
+Five fresh reviewers, one per lens, on `release/1.0.0` at 6b2fd91. Lens (b) reported no
+finding. Every other finding was fixed in fcbfc64, with the direct `quote()` check and
+the exact README and GUIDE counts added in the commit that records this round; each
+behaviour fix has a contract test
+that failed on 6b2fd91 (the `format()` test fails there on Python 3.10 only, where the
+behaviour differed) and passes now.
+
+| Lens | Id | Finding | Fix | Contract |
+| --- | --- | --- | --- | --- |
+| a, d | a-F1, d-F2 | `format()` of a `Weekday` differed between 3.10 and 3.11+; `f"{FRIDAY:d}"` failed on 3.10 | `Weekday.__format__`: the name without a spec, `int` formatting with one; GUIDE and docstring | `test_contract_edges.py::test_format_gives_the_name_without_a_spec_and_formats_the_number_with_one` |
+| a, c | a-F2, c-F2 | `Weekday(x)` skipped the argument checks (`Weekday(True)`, `Weekday(4.0)`, `Weekday("4")`, `Weekday(10**5000)`) | a metaclass `__call__` runs the shared check before the lookup | `test_contract_edges.py::test_the_constructor_checks_its_argument_like_every_function` |
+| a | a-F3 | `ByDay` was typed `weekday: Weekday`, so `ByDay(date.weekday(), -1)` failed `mypy --strict` | explicit `__init__(weekday: int, ordinal: int \| None = None)`; the field stays a `Weekday`; pinned signature updated | `test_contract_api.py::test_class_signatures_are_pinned`, `test_contract_edges.py::test_byday_takes_an_int_weekday_and_stores_a_weekday`, e2e consumer under `mypy --strict` |
+| a | a-F4 | CHANGELOG: undated 0.2.0 and 0.1.0, no link definitions | dates from git (2026-10-13, 2026-10-12) and link definitions for every version | docs |
+| c | c-F1 | argparse errors repeated unknown options and extra arguments in full | an option-like argument over 40 characters is refused with `quote()`; extra arguments are reported through `quote()` | `test_contract_edges.py::test_command_line_errors_quote_at_most_40_characters` (9 vectors) |
+| c | c-F3 | numpy 1.x `bool_` passed as 0/1 | `_as_int` refuses numpy's bool scalar by type | `test_contract_edges.py::test_numpy_bool_scalars_are_refused_like_bool`, `test_real_numpy_bools_are_refused` |
+| c | c-F4 | `quote()` and the parsers called a `str` subclass's own `__repr__`, `upper`, `split` | the text is read through `str.__str__` first | `test_contract_edges.py::test_str_subclasses_are_read_as_plain_strings` |
+| d | d-F1 | `inspect.getsource` failed for `ByDay`, `Weekday`, `NoSuchDayError` (wrong source on 3.13+) because their `__module__` was rewritten | the classes keep their defining module; only the functions are rewritten; GUIDE Stability says which module pickles of the classes name and that it stays importable in 1.x | `test_contract_edges.py::test_public_classes_keep_their_source_and_functions_report_the_package`, `test_pickles_of_the_classes_load_from_their_defining_modules`, `test_contract_api.py::test_functions_report_the_package_and_classes_their_defining_module` |
+| d | d-F3 | the sdist shipped CONTRIBUTING without `requirements-dev.txt` | added to the sdist include list | `test_e2e_wheel.py::test_sdist_ships_the_manifest_but_no_upstream_copies` |
+| e | e-F1 (W25) | no test bounded `TypeError` messages | none needed | `test_contract_edges.py::test_type_errors_name_the_type_and_never_the_value` (10 entry points) |
+| e | e-F2 (X01) | `python -m nthweekday` exit codes were not pinned | none needed | `test_cli.py::test_python_m_exits_with_the_code_of_main`, and the e2e test runs exit 1 and 2 through `python -m` |
+| e | e-F3 (P05) | the method `__module__` rewrite was untested and the doctest test had a floor | the method rewrite is gone with d-F1 (methods keep their module, like their classes); the doctest test pins the exact 17 docstrings and 44 examples, collected from the package and from each class | `test_docs_examples.py::test_every_public_name_has_a_docstring_example_that_passes` |
+| e | e-F4 (C14) | `-h` after a signed BYDAY was not pinned | none needed | `test_cli.py::test_options_may_come_after_a_signed_byday` |
+| e | e-F5 (C15) | an explicit `--` was not pinned | none needed | `test_cli.py::test_an_explicit_double_dash_keeps_a_signed_byday` |
+| e | e-F6 (M17, M20) | year padding below 1000 in messages was not pinned | none needed | `test_year.py::test_years_below_1000_are_padded_to_four_digits_in_messages` |
+
+Lens (e)'s P05 asked for a test that methods report `nthweekday` as their module. That
+promise conflicted with d-F1 (a class and its methods must name the file that defines
+them for `inspect.getsource`), so the GUIDE no longer makes it; the risk P05 showed,
+docstrings silently dropped, is closed by the exact doctest list.
+
+Behaviour changes, all in the CHANGELOG 1.0.0 section: `Weekday(n)` checks `n`;
+`format()` of a `Weekday` with a spec formats the number on 3.10 too; `ByDay` accepts
+`weekday: int` in its signature; numpy 1.x bool scalars raise `TypeError`; `str`
+subclasses are read as plain text; the command line bounds every error; the classes keep
+their defining module.
+
+Re-verified after the fixes, on this PC under a machine turn: the sdist built from the
+tree and the wheel built from the sdist pass `twine check --strict`; the sdist now holds
+`requirements-dev.txt`. The wheel installed in a fresh venv per interpreter and the
+sdist's suite run with `src` removed and the fetched sources present: CPython 3.10.19,
+3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded, 418 passed and 1 skipped (the
+real numpy test, numpy absent) on each. With numpy 1.26.4 on 3.11.5,
+`nth_weekday(2026, np.bool_(True), ...)` raises `TypeError` and the edge contracts pass.
+`pytest -m e2e`: 2 passed. Gates on the tree: `ruff format --check .`, `ruff check .`,
+`mypy --strict src`, `mypy --strict src tests` and `pytest` (419 passed) exit 0.
+
+Mutants for this round, each applied alone to a copy of the tree, full suite with `-x`:
+
+| # | Mutation | Verdict | First test that failed |
+| --- | --- | --- | --- |
+| W25 | `TypeError` message shows `repr(value)` | killed | `test_contract_edges.py::test_numpy_bool_scalars_are_refused_like_bool` |
+| X01 | `__main__` drops `sys.exit` | killed | `test_cli.py::test_python_m_exits_with_the_code_of_main` |
+| P05 | functions keep their private module | killed | `test_contract_api.py::test_functions_report_the_package_and_classes_their_defining_module` |
+| C14 | only `--` flags moved before a signed BYDAY | killed | `test_cli.py::test_options_may_come_after_a_signed_byday` |
+| C15 | user `--` guard removed | killed | `test_cli.py::test_an_explicit_double_dash_keeps_a_signed_byday` |
+| M17 | year message unpadded in `nth_weekday_in_year` | killed | `test_year.py::test_years_below_1000_are_padded_to_four_digits_in_messages` |
+| M20 | year message unpadded in `nth_weekday` | killed | `test_year.py::test_years_below_1000_are_padded_to_four_digits_in_messages` |
+| N1 | `Weekday(x)` check removed | killed | `test_contract_edges.py::test_the_constructor_checks_its_argument_like_every_function` |
+| N2 | numpy bool check removed | killed | `test_contract_edges.py::test_numpy_bool_scalars_are_refused_like_bool` |
+| N3 | `parse_byday` uses the subclass's methods | killed | `test_contract_edges.py::test_str_subclasses_are_read_as_plain_strings` |
+| N4 | `quote()` uses the subclass's `__repr__` | killed (after adding a direct `quote()` check; it survived the first run) | `test_contract_edges.py::test_str_subclasses_are_read_as_plain_strings` |
+| N5 | long option check removed | killed | `test_contract_edges.py::test_command_line_errors_quote_at_most_40_characters[args4]` |
+| N6 | extra arguments not quoted | killed | `test_contract_edges.py::test_command_line_errors_quote_at_most_40_characters[args0]` |
+| N7 | `ByDay` stores the int unconverted | killed | `test_byday.py::test_byday_validates_its_fields` |
+
+Disputed findings: none.
