@@ -17,6 +17,7 @@ Progress:
 - [x] Gates (item 15)
 - [x] PR and trace guard
 - [x] QA lenses round 1: every finding fixed (fcbfc64 and the report commit)
+- [x] Author follow-up: three more surviving mutants closed, one defect fixed (d89a99f)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -33,7 +34,7 @@ Progress:
 | 7 | Real ground truth | PASS: 5 sources re-fetched 2026-10-24 (hashes unchanged), grammar read from the RFC text, `python-dateutil` and `calendar` oracles |
 | 8 | Real e2e from the wheel | PASS: built wheel in a fresh venv, CLI by subprocess, consumer typing; no PyPI release to upgrade from |
 | 9 | Seeded fuzz, no crash, hang or blowup | PASS: `tests/test_fuzz.py` |
-| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (418 passed, numpy test skipped, each; QA round 1); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
+| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (424 passed, numpy test skipped, each; author follow-up); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
 | 11 | README and `twine check` | PASS: `twine check --strict` on wheel and sdist, absolute links, badge |
 | 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-24 |
 | 13 | pyproject 1.0.0, Production/Stable | PASS |
@@ -41,7 +42,7 @@ Progress:
 | 15 | Gates each exit 0 | PASS: see Gates |
 | 16 | Independent reviewer | pending (orchestrator) |
 | 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
-| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed |
+| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4 |
 | 19 | Five independent QA lenses | pending (orchestrator) |
 
 ## Baseline on 0.2.0 (before any change)
@@ -163,8 +164,8 @@ killed; the column shows the first failing test.
 
 On this PC with the fetched sources present, each command on its own:
 `ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests`
-and `pytest` (419 passed after QA round 1, the two opt-in e2e tests deselected) exit 0;
-`pytest -m e2e` 2 passed.
+and `pytest` (425 passed after the author follow-up, the two opt-in e2e tests deselected)
+exit 0; `pytest -m e2e` 2 passed.
 
 ## QA lenses (item 19) and independent review (item 16)
 
@@ -234,5 +235,36 @@ Mutants for this round, each applied alone to a copy of the tree, full suite wit
 | N5 | long option check removed | killed | `test_contract_edges.py::test_command_line_errors_quote_at_most_40_characters[args4]` |
 | N6 | extra arguments not quoted | killed | `test_contract_edges.py::test_command_line_errors_quote_at_most_40_characters[args0]` |
 | N7 | `ByDay` stores the int unconverted | killed | `test_byday.py::test_byday_validates_its_fields` |
+
+### Author follow-up after round 1
+
+Three further mutants on the round 1 fixes survived a run of the suite at 9b5bfb3; each
+pointed at a missing contract, and one at a real defect.
+
+- `Weekday(x, *args, **kwargs)` passed any extra argument to the enum machinery. A
+  keyword alone made it an unchecked lookup again (`Weekday(True, module=None)` gave
+  `Weekday.TUESDAY`), and `Weekday("x" * 10**6, "y")` raised a `ValueError` of
+  1,000,032 characters. Fixed: `Weekday()` takes exactly one argument and raises a fixed
+  `TypeError` for anything more (the functional API cannot extend an enum with members, so
+  no working call is lost). CHANGELOG and GUIDE updated.
+- The numpy bool check names `bool_` (numpy 1.x) and `bool` (numpy 2.x); only the first
+  name was tested. Checked on this PC: numpy 1.26.4 on 3.11.5 has `numpy.bool_` with
+  `__index__`, numpy 2.3.4 on 3.13.2 has `numpy.bool` without it; both raise `TypeError`
+  and the edge contracts pass with each installed.
+- The long-option guard was only tested far past the limit; an option of 41 to 80
+  characters was not pinned, and argparse repeats an explicit argument in full.
+
+| # | Mutation | Verdict | First test that failed |
+| --- | --- | --- | --- |
+| S06 | extra keywords passed through to the lookup | killed | `test_contract_edges.py::test_the_constructor_checks_its_argument_like_every_function` |
+| S06b | extra arguments passed through to the enum machinery | killed | `test_contract_edges.py::test_the_constructor_checks_its_argument_like_every_function` |
+| S15 | numpy 2.x `bool` name dropped | killed | `test_contract_edges.py::test_numpy_bool_scalars_are_refused_like_bool[bool]` |
+| S28 | long-option guard at 80 characters instead of 40 | killed | `test_contract_edges.py::test_an_option_past_the_quote_limit_is_cut[41]` |
+
+Re-verified under a machine turn on this PC: `pytest` 425 passed, `pytest -m e2e` 2
+passed; the sdist and the wheel built from it pass `twine check --strict`, with the same
+contents as before; the wheel in a fresh venv and the sdist's suite with `src` removed and
+the fetched sources present on CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2
+free-threaded: 424 passed and 1 skipped (the real numpy test, numpy absent) on each.
 
 Disputed findings: none.
