@@ -133,5 +133,5 @@ def test_sdist_ships_the_manifest_but_no_upstream_copies(tmp_path: Path) -> None
     assert [n for n in names if n.startswith("data/")] == ["data/upstream/MANIFEST.json"]
     for doc in ("README.md", "GUIDE.md", "CHANGELOG.md", "LICENSE", "src/nthweekday/py.typed"):
         assert doc in names
-    assert not [n for n in names if n.startswith(("IMPROVEMENTS", "CERT-", ".git"))]
+    assert not [n for n in names if n.startswith(("IMPROVEMENTS", "CERT-", ".git/", ".github"))]
     assert not [n for n in names if "__pycache__" in n or n.endswith(".pyc")]
