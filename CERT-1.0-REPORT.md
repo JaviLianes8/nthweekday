@@ -25,7 +25,7 @@ Progress:
 | --- | --- | --- |
 | 1 | Public API reviewed for stability | PASS: 20 names kept from 0.2.0; signatures, defaults and return types pinned by `tests/test_contract_api.py`; changes in CHANGELOG |
 | 2 | `__all__` exact, no private imports in docs | PASS: `tests/test_contract.py`, `tests/test_docs_examples.py` |
-| 3 | Docstrings with runnable examples, doctests | PASS: 43 doctests found from the package top, every public name covered; README (21) and GUIDE (34) results run as tests |
+| 3 | Docstrings with runnable examples, doctests | PASS: 43 examples in 17 docstrings, found from the package top, every public name covered; README (21) and GUIDE (34) results run as tests |
 | 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel |
 | 5 | Typed, documented, bounded errors | PASS: `NoSuchDayError` (a `ValueError`), `ValueError`, `TypeError`; messages quote at most 40 characters and never print a huge integer |
 | 6 | Contract tests of every public name | PASS |
