@@ -82,9 +82,11 @@ release on. 0.2.0 was never published to PyPI, so 1.0.0 is the first release the
   and `None` passed to any of them but `byday_dates`' `month` and `ByDay`'s `ordinal`,
   which take `None` by design. `Weekday(value)` is included: pyright reads that call
   through the enum's metaclass, whose `value` is now typed `SupportsIndex` too (it took
-  any object, so pyright let `Weekday("MO")` through), and whose extra arguments are
-  typed `NoReturn`, so both checkers also flag `Weekday(3, 4)` and
-  `Weekday(3, module="x")`, which always raise `TypeError` (pyright let them through).
+  any object, so pyright let `Weekday("MO")` through), and which type checkers see as
+  taking that one value and nothing else. So both checkers also flag `Weekday(3, 4)` and
+  `Weekday(3, module="x")`, which always raise `TypeError` (pyright let them through),
+  and both still accept an unpacked call that runs, such as `Weekday(*[3])` or
+  `Weekday(**{"value": 3})`.
 - numpy's bool scalar is refused like `bool` with numpy 1.x too (it has `__index__`
   there).
 - A `str` subclass passed to `parse_byday` or `Weekday.parse` is read as its plain text;

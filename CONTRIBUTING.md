@@ -16,6 +16,8 @@ pip install -r requirements-dev.txt
   holiday pages some tests compare with (they skip without them), and `pytest -m e2e`
   builds the wheel and drives the installed package.
 - Run `scripts/check.ps1` (format, lint, types, tests) and make sure it passes.
+  With `pyright` installed (`pip install pyright`), `tests/test_typing.py` also checks what
+  pyright accepts and refuses; without it those two tests skip.
 - One logical change per commit, imperative subject line.
 
 Open an issue first if the change is large or shifts the public API.

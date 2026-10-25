@@ -18,19 +18,22 @@ _ONE_VALUE = inspect.Signature(
 
 
 class _CheckedEnumType(EnumMeta):
-    # Typed for checkers that read it (pyright; mypy reads __new__): Weekday(n) is a Weekday,
-    # n an integer, extra arguments refused. Narrower than EnumMeta's, hence the ignore.
-    def __call__(  # type: ignore[override]
-        cls: type[_E], value: SupportsIndex, *args: NoReturn, **kwargs: NoReturn
-    ) -> _E:
-        # A lookup by value matches True and 4.0 too, as they equal 1 and 4; check it first
-        # so that Weekday(x) refuses what every function refuses. Extra arguments belong to
-        # the functional API, which cannot extend an enum with members; a keyword alone
-        # (module=, qualname=) would turn the call back into an unchecked lookup.
-        if args or kwargs:
-            raise TypeError("Weekday() takes one argument, the weekday number")
-        day: _E = super().__call__(_int_in("weekday", value, 0, 6))  # type: ignore[misc]
-        return day
+    # Checkers see one value and no extras (pyright reads this; mypy reads __new__), so an
+    # unpacked call type-checks. Narrower than EnumMeta's call, hence the ignore.
+    if TYPE_CHECKING:
+
+        def __call__(cls: type[_E], value: SupportsIndex) -> _E: ...  # type: ignore[override]
+
+    else:
+
+        def __call__(
+            cls: type[_E], value: SupportsIndex, *args: NoReturn, **kwargs: NoReturn
+        ) -> _E:
+            # A lookup by value takes True and 4.0, equal to 1 and 4, so check first. Extra
+            # arguments are the functional API's, and a keyword alone would skip the check.
+            if args or kwargs:
+                raise TypeError("Weekday() takes one argument, the weekday number")
+            return super().__call__(_int_in("weekday", value, 0, 6))
 
     @property
     def __signature__(cls) -> inspect.Signature:
@@ -153,8 +156,7 @@ def _shown(number: int) -> str:
 
 
 def _is_bool(value: object) -> bool:
-    # numpy's bool scalar (bool_ before 2.0, bool after) is not a bool subclass, and before
-    # numpy 2.0 it has __index__, so it is known by its type.
+    # numpy's bool scalar is no bool subclass and had __index__ before numpy 2.0: go by type.
     kind = type(value)
     return isinstance(value, bool) or (
         kind.__module__ == "numpy" and kind.__name__ in ("bool_", "bool")

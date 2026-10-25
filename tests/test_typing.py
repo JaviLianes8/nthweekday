@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -36,6 +39,13 @@ n: int = week_of_month(d, Index())
 # None is meaningful here: a yearly rule, an entry without an ordinal.
 dates = byday_dates(2026, None, "MO")
 b = ByDay(1, None)
+# Unpacked arguments run, so neither checker may refuse them.
+values: list[int] = [3]
+named: dict[str, int] = {"value": 3}
+w = Weekday(*[3])
+w = Weekday(**{"value": 3})
+w = Weekday(*values)
+w = Weekday(**named)
 """
 
 # Each line must be refused with the error code after it.
@@ -50,11 +60,20 @@ Weekday(3, module="x")  # call-arg
 """
 
 
+# pyright's names for mypy's error codes in REFUSED.
+PYRIGHT_RULES = {"arg-type": "reportArgumentType", "call-arg": "reportCallIssue"}
+
+
+def _source_root() -> Path | None:
+    # From a source tree the package is found through an extra path; installed, through py.typed.
+    root = Path(nthweekday.__file__).resolve().parent.parent
+    return None if root.name == "site-packages" else root
+
+
 def _mypy(tmp_path: Path, source: str) -> tuple[str, int]:
     api = pytest.importorskip("mypy.api")
-    # From a source tree the package is found through mypy_path; installed, through py.typed.
-    root = Path(nthweekday.__file__).resolve().parent.parent
-    search = "" if root.name == "site-packages" else f"mypy_path = {root.as_posix()}\n"
+    root = _source_root()
+    search = "" if root is None else f"mypy_path = {root.as_posix()}\n"
     (tmp_path / "mypy.ini").write_text(f"[mypy]\n{search}", encoding="utf-8")
     (tmp_path / "caller.py").write_text(source, encoding="utf-8")
     out, err, status = api.run(
@@ -88,3 +107,41 @@ def test_a_weekday_call_without_one_integer_fails_type_checking(tmp_path: Path) 
         for match in re.finditer(r"caller\.py:(\d+): error: .*\[([a-z-]+)\]$", out, re.M)
     }
     assert found == expected, out
+
+
+def _pyright(tmp_path: Path, source: str) -> list[tuple[int, str]]:
+    # Optional: pyright reads Weekday(n) through other annotations than mypy does.
+    pytest.importorskip("pyright")
+    root = _source_root()
+    config: dict[str, object] = {"typeCheckingMode": "strict", "pythonVersion": "3.10"}
+    if root is not None:
+        config["extraPaths"] = [root.as_posix()]
+    (tmp_path / "pyrightconfig.json").write_text(json.dumps(config), encoding="utf-8")
+    (tmp_path / "caller.py").write_text(source, encoding="utf-8")
+    command = [sys.executable, "-m", "pyright", "--outputjson", "--pythonpath", sys.executable]
+    run = subprocess.run(
+        [*command, "-p", str(tmp_path), str(tmp_path / "caller.py")],
+        capture_output=True,
+        text=True,
+        timeout=240,
+        check=False,
+    )
+    report = json.loads(run.stdout)
+    return sorted(
+        (item["range"]["start"]["line"] + 1, item.get("rule", item["message"]))
+        for item in report["generalDiagnostics"]
+        if item["severity"] == "error"
+    )
+
+
+def test_pyright_accepts_what_runs(tmp_path: Path) -> None:
+    assert _pyright(tmp_path, CALLER) == []
+
+
+def test_pyright_refuses_a_weekday_call_without_one_integer(tmp_path: Path) -> None:
+    expected = [
+        (number, PYRIGHT_RULES[line.rsplit("# ", 1)[1]])
+        for number, line in enumerate(REFUSED.splitlines(), 1)
+        if "# " in line
+    ]
+    assert _pyright(tmp_path, REFUSED) == expected
