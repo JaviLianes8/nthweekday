@@ -6,7 +6,7 @@ import inspect
 import operator
 from datetime import MAXYEAR, MINYEAR, date
 from enum import EnumMeta, IntEnum
-from typing import TYPE_CHECKING, SupportsIndex, TypeVar
+from typing import TYPE_CHECKING, NoReturn, SupportsIndex, TypeVar
 
 _CODES = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
 # Error messages quote at most this many characters of what the caller passed.
@@ -18,11 +18,10 @@ _ONE_VALUE = inspect.Signature(
 
 
 class _CheckedEnumType(EnumMeta):
-    # Typed through the class it is called on, so a checker that reads this signature
-    # (pyright does, mypy has its own enum rule) sees Weekday(n) return a Weekday and
-    # checks n as an integer. EnumMeta takes any value, hence the narrower override.
+    # Typed for checkers that read it (pyright; mypy reads __new__): Weekday(n) is a Weekday,
+    # n an integer, extra arguments refused. Narrower than EnumMeta's, hence the ignore.
     def __call__(  # type: ignore[override]
-        cls: type[_E], value: SupportsIndex, *args: object, **kwargs: object
+        cls: type[_E], value: SupportsIndex, *args: NoReturn, **kwargs: NoReturn
     ) -> _E:
         # A lookup by value matches True and 4.0 too, as they equal 1 and 4; check it first
         # so that Weekday(x) refuses what every function refuses. Extra arguments belong to

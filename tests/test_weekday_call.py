@@ -32,3 +32,11 @@ def test_the_call_types_its_value_as_supports_index() -> None:
     # the value is typed here as every other integer parameter is.
     hints = typing.get_type_hints(type(Weekday).__call__)
     assert hints["value"] is typing.SupportsIndex
+
+
+def test_the_call_types_extra_arguments_as_never_given() -> None:
+    # Extra arguments always raise TypeError; NoReturn tells pyright so, as the __new__
+    # stub tells mypy, so Weekday(3, 4) and Weekday(3, module="x") fail type checking.
+    hints = typing.get_type_hints(type(Weekday).__call__)
+    assert hints["args"] is typing.NoReturn
+    assert hints["kwargs"] is typing.NoReturn

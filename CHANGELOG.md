@@ -78,10 +78,13 @@ release on. 0.2.0 was never published to PyPI, so 1.0.0 is the first release the
   `typing.SupportsIndex` instead of `int`, so a numpy integer type-checks under mypy and
   pyright as it already ran (`ByDay` was typed `weekday: Weekday` in 0.2.0, so a
   `date.weekday()` value did not type-check either). This only widens the types. `ByDay`
-  still stores a `Weekday`. Both checkers flag a `str`, `float` or `None` passed to any of
-  them, `Weekday(value)` included: pyright reads that call through the enum's metaclass,
-  whose `value` is now typed `SupportsIndex` too (it took any object, so pyright let
-  `Weekday("MO")` through).
+  still stores a `Weekday`. Both checkers flag a `str` or `float` passed to any of them,
+  and `None` passed to any of them but `byday_dates`' `month` and `ByDay`'s `ordinal`,
+  which take `None` by design. `Weekday(value)` is included: pyright reads that call
+  through the enum's metaclass, whose `value` is now typed `SupportsIndex` too (it took
+  any object, so pyright let `Weekday("MO")` through), and whose extra arguments are
+  typed `NoReturn`, so both checkers also flag `Weekday(3, 4)` and
+  `Weekday(3, module="x")`, which always raise `TypeError` (pyright let them through).
 - numpy's bool scalar is refused like `bool` with numpy 1.x too (it has `__index__`
   there).
 - A `str` subclass passed to `parse_byday` or `Weekday.parse` is read as its plain text;
