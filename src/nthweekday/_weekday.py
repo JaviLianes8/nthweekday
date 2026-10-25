@@ -19,8 +19,11 @@ _ONE_VALUE = inspect.Signature(
 
 class _CheckedEnumType(EnumMeta):
     # Typed through the class it is called on, so a checker that reads this signature
-    # (pyright does, mypy has its own enum rule) sees Weekday(n) return a Weekday.
-    def __call__(cls: type[_E], value: object, *args: object, **kwargs: object) -> _E:
+    # (pyright does, mypy has its own enum rule) sees Weekday(n) return a Weekday and
+    # checks n as an integer. EnumMeta takes any value, hence the narrower override.
+    def __call__(  # type: ignore[override]
+        cls: type[_E], value: SupportsIndex, *args: object, **kwargs: object
+    ) -> _E:
         # A lookup by value matches True and 4.0 too, as they equal 1 and 4; check it first
         # so that Weekday(x) refuses what every function refuses. Extra arguments belong to
         # the functional API, which cannot extend an enum with members; a keyword alone

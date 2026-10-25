@@ -25,3 +25,10 @@ def test_the_call_is_typed_to_return_the_class_it_is_called_on() -> None:
     assert isinstance(returned, typing.TypeVar)
     assert hints["cls"] == type[returned]
     assert typing.Any not in hints.values()
+
+
+def test_the_call_types_its_value_as_supports_index() -> None:
+    # pyright reads Weekday(n) through this signature (mypy through the __new__ stub), so
+    # the value is typed here as every other integer parameter is.
+    hints = typing.get_type_hints(type(Weekday).__call__)
+    assert hints["value"] is typing.SupportsIndex

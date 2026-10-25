@@ -46,7 +46,10 @@ def test_errors_never_write_an_unprintable_character(
 
 @pytest.mark.parametrize(
     "option",
-    ["-help", "-hx", "-hh", "--=x", "-=", "--yearly=1", "--help=x", "-yearly", "---yearly"],
+    [
+        *("-help", "-hx", "-hh", "--=x", "-=", "--yearly=1", "--help=x", "-yearly", "---yearly"),
+        *("--YEARLY", "--Help", "-H", "--yearly ", "--h\t", "-h "),
+    ],
 )
 def test_malformed_options_are_unrecognized_on_every_version(
     capsys: pytest.CaptureFixture[str], option: str
@@ -69,6 +72,9 @@ def test_malformed_options_are_unrecognized_on_every_version(
         (("--version", "-h"), "version"),
         (("--vers", "--he"), "version"),
         (("2026", "-1FR", "--h"), "help"),
+        (("--yearly", "--version"), "version"),
+        (("--yearly", "-h"), "help"),
+        (("--ye", "--vers"), "version"),
     ],
 )
 def test_the_first_of_help_and_version_wins_over_anything_else(
@@ -90,6 +96,20 @@ def test_the_long_option_guard_starts_past_40_characters(
     assert code == 2 and err.endswith(f"error: unrecognized arguments: '{forty}'\n")
     code, _, err = _run(capsys, forty + "q", "2026", "MO")
     assert code == 2 and err.endswith(f"error: unrecognized option '{forty}'... (41 characters)\n")
+
+
+def test_the_long_option_guard_reads_every_option(capsys: pytest.CaptureFixture[str]) -> None:
+    long = "-" + "q" * 40
+    code, _, err = _run(capsys, "-q", long, "2026", "MO")
+    assert code == 2 and err.endswith(
+        f"error: unrecognized option '{long[:40]}'... (41 characters)\n"
+    )
+
+
+def test_unknown_options_are_listed_in_the_order_given(capsys: pytest.CaptureFixture[str]) -> None:
+    code, out, err = _run(capsys, "-b", "-a", "2026", "MO", "-c")
+    assert (code, out) == (2, "")
+    assert err.endswith("error: unrecognized arguments: '-b -a -c'\n")
 
 
 def test_argparse_reads_at_most_the_three_options_and_two_values(
