@@ -51,13 +51,13 @@ def _split(args: Sequence[str]) -> tuple[list[str], list[str]]:
 
 
 def _option(flag: str) -> str | None:
-    # One rule on every Python version: -h, or a non-empty prefix of a long option without
-    # "=", as none takes a value. argparse read "-hx", "-=" and "--=x" differently before
-    # 3.12, and its "ambiguous option" error repeats the text unescaped.
+    # One rule on every Python version: -h, or a prefix of exactly one long option (none
+    # takes a value, so "--yearly=1" is no option). argparse read "-hx", "-=" and "--=x"
+    # differently before 3.12, and its "ambiguous option" error repeats the text unescaped.
     if flag == "-h":
         return "--help"
-    found = [o for o in _OPTIONS if o.startswith(flag)]
-    return found[0] if flag[2:] and "=" not in flag and len(found) == 1 else None
+    found = [option for option in _OPTIONS if option.startswith(flag)]
+    return found[0] if len(found) == 1 else None
 
 
 def main(argv: Sequence[str] | None = None) -> int:
