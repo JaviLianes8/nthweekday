@@ -22,6 +22,7 @@ Progress:
 - [x] QA lenses round 2 (a, c, e on 5c2d0db): every finding fixed (86ef53e and the report commit)
 - [x] QA lenses round 3 (a, c, e on 057be74): every finding fixed (9a5b316, 886daf0, 7921b71 and the report commit)
 - [x] QA lenses round 4 (a, e on ad36216): every finding fixed (f470e34 and the report commit)
+- [x] QA lenses round 5 (a, e on 558ce09): every finding fixed (47e6b79 and the report commit)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -32,7 +33,7 @@ Progress:
 | 1 | Public API reviewed for stability | PASS: 20 names kept from 0.2.0; signatures, defaults and return types pinned by `tests/test_contract_api.py`; changes in CHANGELOG |
 | 2 | `__all__` exact, no private imports in docs | PASS: `tests/test_contract.py`, `tests/test_docs_examples.py` |
 | 3 | Docstrings with runnable examples, doctests | PASS: 44 examples in 17 docstrings, pinned exactly, every public name covered; README (21) and GUIDE (37) results run as tests, counts pinned |
-| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel; integer parameters typed `SupportsIndex` for mypy and pyright (`Weekday(value)` included), checked by `tests/test_typing.py` on every interpreter and `tests/test_weekday_call.py` |
+| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel; integer parameters typed `SupportsIndex` for mypy and pyright (`Weekday(value)` included), checked by `tests/test_typing.py` on every interpreter and `tests/test_weekday_call.py`; the calls both checkers must refuse (`Weekday(None)`, `Weekday("MO")`, `Weekday(4.0)`, extra arguments) pinned by `tests/test_typing.py` |
 | 5 | Typed, documented, bounded errors | PASS: `NoSuchDayError` (a `ValueError`), `ValueError`, `TypeError`; messages quote at most 40 characters and never print a huge integer |
 | 6 | Contract tests of every public name | PASS |
 | 7 | Real ground truth | PASS: 5 sources re-fetched 2026-10-24 (hashes unchanged), grammar read from the RFC text, `python-dateutil` and `calendar` oracles |
@@ -46,7 +47,7 @@ Progress:
 | 15 | Gates each exit 0 | PASS: see Gates |
 | 16 | Independent reviewer | pending (orchestrator) |
 | 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
-| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10; QA round 3 fixes 19 of 19; QA round 4 fixes 7 of 7 |
+| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10; QA round 3 fixes 19 of 19; QA round 4 fixes 7 of 7; QA round 5 fixes 6 of 6 |
 | 19 | Five independent QA lenses | pending (orchestrator) |
 
 ## Baseline on 0.2.0 (before any change)
@@ -445,3 +446,41 @@ Gates on the tree, under a machine turn on this PC with CPython 3.13.2: `ruff fo
 (499 passed) exit 0; `pytest -m e2e`: 2 passed.
 
 Disputed findings (round 4): none.
+
+### Round 5
+
+Lenses (a) and (e) reviewed `release/1.0.0` at 558ce09. Lens (a) found a-N1 fixed and
+reported two findings (N2, N3); lens (e) found its five earlier findings killed and
+reported one surviving mutant (W21) out of 21 probes. All three are fixed in 47e6b79.
+N3 was a defect for pyright users: its contract
+(`test_the_call_types_extra_arguments_as_never_given`) was run on 558ce09 with Python
+3.13.2 and failed there (`object` is not `NoReturn`); it passes now. W21 was a missing
+contract: the new negative typing test passes on 558ce09 and fails on the lens's mutant.
+N2 was a docs overclaim, fixed in the CHANGELOG.
+
+| Lens | Id | Finding | Fix | Contract |
+| --- | --- | --- | --- | --- |
+| a | N2 | the CHANGELOG said both checkers flag `None` passed to any integer parameter, but `byday_dates`' `month` and `ByDay`'s `ordinal` take `None` by design | the sentence now says `str` or `float` anywhere, and `None` anywhere but those two | `tests/test_typing.py` type-checks `byday_dates(2026, None, "MO")` and `ByDay(1, None)` as accepted |
+| a | N3 | the metaclass `__call__` typed extra arguments `object`, so pyright accepted `Weekday(3, 4)` and `Weekday(3, module="x")`, which always raise `TypeError` and which mypy rejects | `*args: NoReturn, **kwargs: NoReturn`. pyright 1.1.414 strict on lens (a)'s probes: `arity.py` 4 errors (2 before: `Weekday(3, 4)` and `Weekday(3, module="x")` now flagged), `valid.py` 0, `invalid.py` 7, `n1_repro.py` 3, `every_param.py` 16 (unchanged); `_weekday.py` keeps its one pre-existing error; `mypy --strict src tests` clean for `--python-version` 3.10 to 3.14 | `tests/test_weekday_call.py::test_the_call_types_extra_arguments_as_never_given` |
+| e | N6-W21 | no contract pinned that mypy refuses `Weekday(None)`: the only negative line was typed `object` | none needed | `tests/test_typing.py::test_a_weekday_call_without_one_integer_fails_type_checking` runs mypy `--strict` on `Weekday(None)`, `Weekday("MO")`, `Weekday(4.0)` (each `[arg-type]`), `Weekday(3, 4)` and `Weekday(3, module="x")` (each `[call-arg]`) and requires exactly those errors on those lines |
+
+Behaviour change, in the CHANGELOG 1.0.0 section: pyright now flags extra arguments to
+`Weekday(value)`, as mypy already did. Nothing changes at run time.
+
+Mutants on these fixes, each applied alone to a copy of the tree with the fetched sources,
+the whole suite run with `-x` and a 300 s per-test limit on 3.13.2. V03 is lens (e)'s W21.
+
+| # | Mutation | Verdict | First test that failed |
+| --- | --- | --- | --- |
+| V01 | `Weekday` call extra positional arguments typed `object` | killed | `test_weekday_call.py::test_the_call_types_extra_arguments_as_never_given` |
+| V02 | `Weekday` call extra keyword arguments typed `object` | killed | `test_weekday_call.py::test_the_call_types_extra_arguments_as_never_given` |
+| V03 | `__new__` stub value typed `SupportsIndex \| None` | killed | `test_typing.py::test_a_weekday_call_without_one_integer_fails_type_checking` |
+| V04 | `__new__` stub value typed `object` | killed | `test_typing.py::test_a_weekday_call_without_one_integer_fails_type_checking` |
+| V05 | `__new__` stub takes `*args: object` | killed | `test_typing.py::test_a_weekday_call_without_one_integer_fails_type_checking` |
+| V06 | `__new__` stub takes `**kwargs: object` | killed | `test_typing.py::test_a_weekday_call_without_one_integer_fails_type_checking` |
+
+Gates on the tree, under a machine turn on this PC with CPython 3.13.2: `ruff format
+--check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest`
+(501 passed) exit 0; `pytest -m e2e`: 2 passed.
+
+Disputed findings (round 5): none.
