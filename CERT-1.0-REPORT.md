@@ -26,7 +26,7 @@ Progress:
 - [x] QA lenses round 6 (a on ea1f46c): every finding fixed (6f41373 and the report commit)
 - [x] Five QA lenses report PASS (item 19)
 - [x] Independent reviewer reports PASS (item 16)
-- [ ] Final gates on a fresh clone of `release/1.0.0`, PR and trace guard
+- [x] Final gates on a fresh clone of `release/1.0.0`, PR and trace guard
 
 ## Scorecard
 
@@ -49,7 +49,7 @@ Progress:
 | 15 | Gates each exit 0 | PASS: see Gates |
 | 16 | Independent reviewer | PASS: fresh review at a0b34af, every item scored PASS (see Final verdicts) |
 | 17 | PR and trace guard | PASS: PR #3 from `release/1.0.0` to `main`, trace guard CLEAN; merge and publish left to the maintainer |
-| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10; QA round 3 fixes 19 of 19; QA round 4 fixes 7 of 7; QA round 5 fixes 6 of 6 |
+| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10; QA round 3 fixes 19 of 19; QA round 4 fixes 7 of 7; QA round 5 fixes 6 of 6; QA round 6 fixes 7 of 7 |
 | 19 | Five independent QA lenses | PASS: lenses (a) to (e) each report PASS (see Final verdicts) |
 
 ## Baseline on 0.2.0 (before any change)
@@ -575,6 +575,17 @@ Independent reviewer's scorecard (a0b34af):
 | 17 | PR and trace guard | PASS: PR #3 open with the reviewed head; all 20 commits authored and committed by Javier Lianes; trace guard run by the maintainer before the merge |
 | 18 | Contracts bite | PASS: mutation tables complete; the reviewer's own spot mutants on late code were killed, except an equivalent one (`_option` accepting an ambiguous prefix: the only ambiguous prefixes are `-` and `--`, which are never treated as options) |
 | 19 | Five QA lenses | PASS: the evidence of each lens exists and was checked |
+
+Final gates on a fresh clone of `release/1.0.0` from GitHub at 8f6c3ab (this report's
+previous commit; the next commit touches only this file), CPython 3.13.2, fetched
+sources present, under a machine turn: `ruff format --check .` (36 files), `ruff check .`,
+`mypy --strict src` (7 files), `mypy --strict src tests` (29 files) and `pytest` (501
+passed, 3 skipped: numpy and the 2 pyright tests) exit 0; `pytest -m e2e` 2 passed.
+`python -m build` gives `nthweekday-1.0.0.tar.gz` and `nthweekday-1.0.0-py3-none-any.whl`,
+`twine check --strict` passes on both. The wheel installed alone in a throwaway venv, the
+suite run from a folder holding only the tests, the docs and the fetched sources: 501
+passed, 3 skipped, with `nthweekday` imported from the venv's `site-packages`;
+`nthweekday --version` prints `nthweekday 1.0.0`. PyPI still answers 404 for the name.
 
 Observation, not a finding (lens d and the reviewer): the README links GUIDE.md on
 `main`, where the file appears once this PR is merged.
