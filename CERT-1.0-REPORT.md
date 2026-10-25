@@ -24,8 +24,9 @@ Progress:
 - [x] QA lenses round 4 (a, e on ad36216): every finding fixed (f470e34 and the report commit)
 - [x] QA lenses round 5 (a, e on 558ce09): every finding fixed (47e6b79 and the report commit)
 - [x] QA lenses round 6 (a on ea1f46c): every finding fixed (6f41373 and the report commit)
-- [ ] Five QA lenses report PASS (item 19)
-- [ ] Independent reviewer reports PASS (item 16)
+- [x] Five QA lenses report PASS (item 19)
+- [x] Independent reviewer reports PASS (item 16)
+- [ ] Final gates on a fresh clone of `release/1.0.0`, PR and trace guard
 
 ## Scorecard
 
@@ -40,16 +41,16 @@ Progress:
 | 7 | Real ground truth | PASS: 5 sources re-fetched 2026-10-24 (hashes unchanged), grammar read from the RFC text, `python-dateutil` and `calendar` oracles |
 | 8 | Real e2e from the wheel | PASS: built wheel in a fresh venv, CLI by subprocess, consumer typing; no PyPI release to upgrade from |
 | 9 | Seeded fuzz, no crash, hang or blowup | PASS: `tests/test_fuzz.py`; QA round 3 replay of lens (c)'s 60,000-argv corpus on 3.10 to 3.14: no problem, no difference between versions |
-| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (486 passed, numpy test skipped, each; QA round 3); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
+| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 (501 passed and 3 skipped against the installed wheel at a0b34af: numpy and the 2 pyright tests), 3.14.2t (QA lens d at 057be74); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
 | 11 | README and `twine check` | PASS: `twine check --strict` on wheel and sdist, absolute links, badge |
 | 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-25 |
 | 13 | pyproject 1.0.0, Production/Stable | PASS |
 | 14 | sdist and wheel contents | PASS |
 | 15 | Gates each exit 0 | PASS: see Gates |
-| 16 | Independent reviewer | pending (orchestrator) |
-| 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
+| 16 | Independent reviewer | PASS: fresh review at a0b34af, every item scored PASS (see Final verdicts) |
+| 17 | PR and trace guard | PASS: PR #3 from `release/1.0.0` to `main`, trace guard CLEAN; merge and publish left to the maintainer |
 | 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10; QA round 3 fixes 19 of 19; QA round 4 fixes 7 of 7; QA round 5 fixes 6 of 6 |
-| 19 | Five independent QA lenses | pending (orchestrator) |
+| 19 | Five independent QA lenses | PASS: lenses (a) to (e) each report PASS (see Final verdicts) |
 
 ## Baseline on 0.2.0 (before any change)
 
@@ -531,3 +532,49 @@ the 3.13.2 venv with pyright 1.1.414: 504 passed. `test_typing.py`, `test_weekda
 3.14.2: 53 passed and 2 skipped (pyright not installed there) on each.
 
 Disputed findings (round 6): none.
+
+### Final verdicts
+
+Every lens and the independent reviewer reported PASS. The verdicts came back to the
+maintainer as text; the evidence (probe scripts, logs, built artifacts) stays in a local
+folder outside the repository, named below relative to that folder.
+
+| Lens | Rounds | Final verdict | Report | Commit |
+| --- | --- | --- | --- | --- |
+| a. API and docs | 5 | PASS | `lens-a-r5/work` (probes; verdict returned as text) | a0b34af |
+| b. Correctness and ground truth | 1 | PASS | `lens-b-r1/r4/out` (dateutil 204,722 comparisons, .NET and ical.js cross-checks) | 057be74 |
+| c. Adversarial and robustness | 2 | PASS | `lens-c-r2/work3/logs` (23 logs; verdict returned as text) | ad36216 |
+| d. Packaging and real e2e | 1 | PASS | `lens-d-r1/r057` (dist, logs, consumer; verdict returned as text) | 057be74 |
+| e. Contract strength | 4 | PASS | `lens-e-r4/REPORT.md` | ea1f46c |
+| Independent reviewer | 1 | PASS | `review-r1/logs` and `review-r1/dist` (verdict returned as text) | a0b34af |
+
+The code changed after lenses (b) and (d) reported (the typing of the `Weekday` call, the
+command line option checks) was re-verified by lenses (a), (c) and (e) and by the
+reviewer's suite, interpreter matrix and e2e at a0b34af.
+
+Independent reviewer's scorecard (a0b34af):
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | Public API stable | PASS: the 20 names pinned by `test_contract_api.py`; every change in the CHANGELOG; functions report `nthweekday` as their module, classes keep their defining module as the CHANGELOG says |
+| 2 | `__all__` exact, no private imports in docs | PASS |
+| 3 | Docstrings with runnable examples | PASS: `doctest.testmod` on the installed package ran 44 examples, 0 failures; `test_docs_examples.py` passes |
+| 4 | Typed end to end | PASS: `mypy --strict src` (7 files) and `src tests` (29 files) exit 0; `py.typed` ships; `test_typing.py` passes with pyright installed |
+| 5 | Typed, bounded errors | PASS: probe messages at most 85 characters, at most 40 characters of input quoted, a huge integer described by its bit count |
+| 6 | Contract tests | PASS: the 3 contract test files pass |
+| 7 | Real ground truth | PASS: all 5 sources re-fetched on 2026-10-25, size and sha256 match `MANIFEST.json`; oracle, grammar and holiday tests pass; the README's dateutil statements re-run as stated |
+| 8 | Real e2e | PASS: `pytest -m e2e` 2 passed; consumer run with `-I` from an empty folder; the script exits 0 and 2 as documented; `python -m nthweekday --version` gives 1.0.0; nothing on PyPI to upgrade from |
+| 9 | Seeded fuzz | PASS: `test_fuzz.py` passes; lens (c)'s corpus shows 0 differences between versions |
+| 10 | Supported Pythons | PASS: 501 passed, 3 skipped against the installed wheel on 3.10.19, 3.11.5, 3.12.12, 3.13.2 and 3.14.2; 3.14.2t covered by lens (d) |
+| 11 | README and `twine check` | PASS: `twine check --strict` on wheel and sdist; GFM rendering, absolute links, GUIDE and CHANGELOG linked |
+| 12 | Dated CHANGELOG section | PASS: `## [1.0.0] - 2026-10-25` |
+| 13 | pyproject | PASS: 1.0.0, Production/Stable, classifiers 3.10 to 3.14, `License-Expression: MIT`, project URLs, keywords, no runtime dependency |
+| 14 | sdist and wheel contents | PASS: 7 modules, `py.typed`, LICENSE, entry points; the sdist ships only `MANIFEST.json` from `data/upstream` |
+| 15 | Gates | PASS: `ruff format --check .` (36 files), `ruff check .`, `mypy --strict src`, `pytest` (503 passed, 1 skipped) |
+| 16 | Independent review | PASS: this review |
+| 17 | PR and trace guard | PASS: PR #3 open with the reviewed head; all 20 commits authored and committed by Javier Lianes; trace guard run by the maintainer before the merge |
+| 18 | Contracts bite | PASS: mutation tables complete; the reviewer's own spot mutants on late code were killed, except an equivalent one (`_option` accepting an ambiguous prefix: the only ambiguous prefixes are `-` and `--`, which are never treated as options) |
+| 19 | Five QA lenses | PASS: the evidence of each lens exists and was checked |
+
+Observation, not a finding (lens d and the reviewer): the README links GUIDE.md on
+`main`, where the file appears once this PR is merged.
