@@ -25,7 +25,14 @@ def _run(capsys: pytest.CaptureFixture[str], *args: str) -> tuple[int, str, str]
 
 @pytest.mark.parametrize(
     "option",
-    ["--=\x1b[2J", "-=\x07", "-=‮​", "--=\x1b]0;owned\x07", "-=\x1b]52;c;aGk=\x07", "-\x00"],
+    [
+        "--=\x1b[2J",
+        "-=\x07",
+        "-=\u202e\u200b",
+        "--=\x1b]0;owned\x07",
+        "-=\x1b]52;c;aGk=\x07",
+        "-\x00",
+    ],
 )
 def test_errors_never_write_an_unprintable_character(
     capsys: pytest.CaptureFixture[str], option: str
