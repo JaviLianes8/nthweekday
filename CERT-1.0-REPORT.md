@@ -20,6 +20,7 @@ Progress:
 - [x] Author follow-up: three more surviving mutants closed, one defect fixed (d89a99f)
 - [x] Resumed 2026-10-25: PyPI re-checked (404), CHANGELOG dated 2026-10-25, gates re-run
 - [x] QA lenses round 2 (a, c, e on 5c2d0db): every finding fixed (86ef53e and the report commit)
+- [x] QA lenses round 3 (a, c, e on 057be74): every finding fixed (9a5b316, 886daf0, 7921b71 and the report commit)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -30,13 +31,13 @@ Progress:
 | 1 | Public API reviewed for stability | PASS: 20 names kept from 0.2.0; signatures, defaults and return types pinned by `tests/test_contract_api.py`; changes in CHANGELOG |
 | 2 | `__all__` exact, no private imports in docs | PASS: `tests/test_contract.py`, `tests/test_docs_examples.py` |
 | 3 | Docstrings with runnable examples, doctests | PASS: 44 examples in 17 docstrings, pinned exactly, every public name covered; README (21) and GUIDE (37) results run as tests, counts pinned |
-| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel |
+| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel; integer parameters typed `SupportsIndex`, checked by `tests/test_typing.py` on every interpreter |
 | 5 | Typed, documented, bounded errors | PASS: `NoSuchDayError` (a `ValueError`), `ValueError`, `TypeError`; messages quote at most 40 characters and never print a huge integer |
 | 6 | Contract tests of every public name | PASS |
 | 7 | Real ground truth | PASS: 5 sources re-fetched 2026-10-24 (hashes unchanged), grammar read from the RFC text, `python-dateutil` and `calendar` oracles |
 | 8 | Real e2e from the wheel | PASS: built wheel in a fresh venv, CLI by subprocess, consumer typing; no PyPI release to upgrade from |
-| 9 | Seeded fuzz, no crash, hang or blowup | PASS: `tests/test_fuzz.py` |
-| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (445 passed, numpy test skipped, each; QA round 2); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
+| 9 | Seeded fuzz, no crash, hang or blowup | PASS: `tests/test_fuzz.py`; QA round 3 replay of lens (c)'s 60,000-argv corpus on 3.10 to 3.14: no problem, no difference between versions |
+| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (486 passed, numpy test skipped, each; QA round 3); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
 | 11 | README and `twine check` | PASS: `twine check --strict` on wheel and sdist, absolute links, badge |
 | 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-25 |
 | 13 | pyproject 1.0.0, Production/Stable | PASS |
@@ -44,7 +45,7 @@ Progress:
 | 15 | Gates each exit 0 | PASS: see Gates |
 | 16 | Independent reviewer | pending (orchestrator) |
 | 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
-| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10 |
+| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10; QA round 3 fixes 19 of 19 |
 | 19 | Five independent QA lenses | pending (orchestrator) |
 
 ## Baseline on 0.2.0 (before any change)
@@ -166,7 +167,7 @@ killed; the column shows the first failing test.
 
 On this PC with the fetched sources present, each command on its own:
 `ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests`
-and `pytest` (446 passed after QA round 2, the two opt-in e2e tests deselected)
+and `pytest` (487 passed after QA round 3, the two opt-in e2e tests deselected)
 exit 0; `pytest -m e2e` 2 passed.
 
 ## QA lenses (item 19) and independent review (item 16)
@@ -326,3 +327,77 @@ was run again on its own and passed). Gates on the tree: `ruff format --check .`
 `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` exit 0.
 
 Disputed findings (round 2): none.
+
+### Round 3
+
+Lenses (a), (c) and (e) reviewed `release/1.0.0` at 057be74 and reported the findings
+below. Every one is fixed in 9a5b316, 886daf0 and 7921b71. The behaviour contracts were
+added first and run on 057be74 with Python 3.13.2: the flag tests (9), the BYDAY message
+tests (5, the updated surrogate count included), the typing test (20 mypy errors) and the
+option tests (14) failed there and pass now. e-F2 to e-F5 were missing contracts, not
+defects: their tests pass on 057be74 and kill the lens's mutants (table below).
+
+| Lens | Id | Finding | Fix | Contract |
+| --- | --- | --- | --- | --- |
+| a | a-F1 | `strict` and `from_end` were read by truth value (`from_end="no"` gave -3, `strict=None` passed) | checked with the other arguments: a `bool` or numpy's bool scalar, `TypeError` otherwise; GUIDE table row and paragraph, README, CHANGELOG | `test_relative.py::test_the_keyword_flags_take_a_bool_and_nothing_else` (8 values, 3 calls), `test_the_keyword_flags_are_checked_before_anything_is_computed`, `test_the_keyword_flags_take_numpy_bool_scalars_as_bools` |
+| a | a-F2 | `invalid BYDAY entry X in Y` quoted two 40-character pieces, up to 80 characters of input | the bad entry is quoted once, followed by its place in a list, `(entry 21 of 21)`; CHANGELOG | `test_contract_api.py::test_a_bad_byday_entry_is_quoted_once_with_its_position` (4 vectors); the surrogate count in `test_messages_quote_at_most_40_characters_and_no_huge_number` is now one piece |
+| a | a-F3 | the CHANGELOG said 0.2.0 crashed on `nthweekday 2026 -- --` | reworded: 0.2.0 (5adde425) on 3.10.19 and 3.11.5 prints `[] selects no date in 2026` and exits 1, replayed here; the traceback belonged to 5c2d0db (`str.__str__` on a list), replayed too | docs |
+| a | a-F4 | the integer parameters were annotated `int`, so a numpy integer failed mypy and pyright although it ran | every integer parameter is typed `typing.SupportsIndex`, and `Weekday` declares a `__new__(value: SupportsIndex)` for type checkers only (mypy reads an enum call through `__new__`); pinned signatures updated; GUIDE, README, CHANGELOG | `test_typing.py::test_any_integer_type_type_checks_where_an_integer_is_asked_for` (mypy `--strict` on a caller of the 11 integer entry points with an `__index__` class, against the source tree and against the installed wheel), the e2e consumer, the pinned signatures in `test_contract_api.py`. pyright 1.1.414 strict on the lens's probe: 0 errors, `Weekday(np.int64(4))` is `Weekday`; mypy with numpy 2.3.5 accepts numpy integers in `Weekday`, `ByDay` and `nth_weekday` |
+| c | c-C1 | `--=...` (and `-=...` on 3.12+) reached stderr unescaped through argparse's "ambiguous option" error | options are read by hand with one rule: `-h`, or a prefix of exactly one of `--help`, `--version`, `--yearly`; anything else that starts with `-` is unknown and reported through `quote()`; argparse only sees the canonical names, each once, and stand-ins for the values | `test_cli_options.py::test_errors_never_write_an_unprintable_character` (6 options, before and after the values) |
+| c | c-C2 | `-help`, `-hx` and `-= 2026 MO --version` gave different exit codes on 3.10/3.11 and 3.12+ | the same rule: unknown on every version, and the first of `-h` and `--version` wins over unknown options; GUIDE, CHANGELOG | `test_malformed_options_are_unrecognized_on_every_version` (9 options), `test_the_first_of_help_and_version_wins_over_anything_else` (7 argvs) |
+| e | e-F1 (N37) | the linear-time test let a quadratic de-duplication pass at times | argparse is called once whatever the number of arguments; the old timing test is replaced by a call count and a wider timing ratio | `test_cli_options.py::test_argparse_reads_at_most_the_three_options_and_two_values` (one call with 3 arguments for 20,000 options), `test_reading_the_arguments_takes_linear_time` (1,000 against 64,000 arguments, at most 256 times as long, 3 shapes) |
+| e | e-F2 (N46) | `-h` next to an unknown option was not pinned | none needed | `test_the_first_of_help_and_version_wins_over_anything_else` (`-q -h`, `-q --version`, `-= 2026 MO --version`) |
+| e | e-F3 (N50) | which of `-h` and `--version` wins was not pinned | none needed | the same test (`-h --version`, `--version -h`, `--vers --he`) |
+| e | e-F4 (N14) | `from None` for a non-iterable value was not pinned | none needed | `test_byday.py::test_byday_dates_hides_the_internal_error_of_a_value_that_is_not_iterable` |
+| e | e-F5 (N42) | the 40-character boundary of the long-option guard was not pinned | none needed | `test_cli_options.py::test_the_long_option_guard_starts_past_40_characters` (40 and 41 characters, exact messages) |
+
+Behaviour changes, all in the CHANGELOG 1.0.0 section: the flags raise `TypeError` for
+anything but a `bool`; a bad BYDAY entry is quoted once with its place; the integer
+parameters are typed `SupportsIndex` (the types only widen); `-help`, `-hx`, `--yearly=1`,
+`--=x` and `-=x` are unknown options on every version.
+
+Mutants on these fixes, each applied alone to a copy of the tree with the fetched sources,
+the whole suite run with `-x` and a 300 s per-test limit on 3.13.2. T08, T11, T13, T14 and
+T16 are lens (e)'s N14, N50, N37, N42 and N46 on the new code.
+
+| # | Mutation | Verdict | First test that failed |
+| --- | --- | --- | --- |
+| T01 | flag check removed | killed | `test_relative.py::test_the_keyword_flags_take_a_bool_and_nothing_else[no]` |
+| T02 | `strict` unchecked | killed | `test_relative.py::test_the_keyword_flags_take_a_bool_and_nothing_else[no]` |
+| T03 | `strict` checked only when the day itself matches | killed | `test_relative.py::test_the_keyword_flags_are_checked_before_anything_is_computed` |
+| T04 | numpy's bool scalar refused as a flag | killed | `test_relative.py::test_the_keyword_flags_take_numpy_bool_scalars_as_bools[bool_]` |
+| T05 | the whole value quoted again | killed | `test_contract_api.py::test_messages_quote_at_most_40_characters_and_no_huge_number` |
+| T06 | entry place counted from 0 | killed | `test_contract_api.py::test_a_bad_byday_entry_is_quoted_once_with_its_position[list]` |
+| T07 | place shown for a single entry | killed | `test_contract_api.py::test_a_bad_byday_entry_is_quoted_once_with_its_position[one]` |
+| T08 | `from None` dropped | killed | `test_byday.py::test_byday_dates_hides_the_internal_error_of_a_value_that_is_not_iterable` |
+| T09 | `-h<more>` read as `-h` | killed | `test_cli_options.py::test_malformed_options_are_unrecognized_on_every_version[-help]` |
+| T10 | `--option=value` read as the option | killed | `test_cli_options.py::test_malformed_options_are_unrecognized_on_every_version[--yearly=1]` |
+| T11 | options sorted | killed | `test_cli_options.py::test_the_first_of_help_and_version_wins_over_anything_else[args4-version]` |
+| T12 | options not de-duplicated | killed | `test_cli_options.py::test_argparse_reads_at_most_the_three_options_and_two_values` |
+| T13 | quadratic de-duplication of unknown options | killed | `test_cli_options.py::test_reading_the_arguments_takes_linear_time[repeated]` |
+| T14 | long-option guard at 40 instead of past 40 | killed | `test_cli_options.py::test_the_long_option_guard_starts_past_40_characters` |
+| T15 | unknown options passed to argparse | killed | `test_cli_options.py::test_errors_never_write_an_unprintable_character[--=\x1b[2J]` |
+| T16 | options read only up to the first unknown one | killed | `test_cli_options.py::test_the_first_of_help_and_version_wins_over_anything_else[args0-version]` |
+| T17 | type-checking `Weekday.__new__` typed `int` | killed | `test_typing.py::test_any_integer_type_type_checks_where_an_integer_is_asked_for` |
+| T18 | `nth_weekday` `n` typed `int` | killed | `test_contract_api.py::test_function_signatures_are_pinned[nth_weekday]` |
+| T19 | `ByDay` `ordinal` typed `int` | killed | `test_contract_api.py::test_class_signatures_are_pinned` |
+
+The linear-time test was run three times each on 3.10.19 and 3.13.2: the tree passed all
+six runs (0.4 to 0.6 s for the three shapes), and the T13 mutant failed all three shapes
+in all six runs (55 to 78 s).
+
+Re-verified under machine turns on this PC: `python -m build` gives the sdist and the
+wheel built from it, both pass `twine check --strict`; the wheel holds the seven modules,
+`py.typed`, the entry point and LICENSE only. The wheel in a fresh venv (with mypy, so the
+typing contract runs against the installed package) and the sdist's suite with `src`
+removed and the fetched sources present on CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2,
+3.14.2 and 3.14.2 free-threaded: 486 passed and 1 skipped (the real numpy test, numpy
+absent) on each. `pytest -m e2e`: 2 passed. Lens (a)'s and lens (c)'s repros through
+`python -m nthweekday` on 3.10.19 and 3.13.2: every stderr printable, the same exit code
+and output on both. Lens (c)'s `cli_fuzz.py` (seed 11, 60,000 argv) on 3.10.19, 3.11.5,
+3.12.12, 3.13.2 and 3.14.2: no problem on any, and `cli_compare.py` finds no exit code or
+stdout difference between them (4,079 on 057be74). Gates on the tree: `ruff format
+--check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest`
+(487 passed) exit 0.
+
+Disputed findings (round 3): none.
