@@ -21,6 +21,7 @@ Progress:
 - [x] Resumed 2026-10-25: PyPI re-checked (404), CHANGELOG dated 2026-10-25, gates re-run
 - [x] QA lenses round 2 (a, c, e on 5c2d0db): every finding fixed (86ef53e and the report commit)
 - [x] QA lenses round 3 (a, c, e on 057be74): every finding fixed (9a5b316, 886daf0, 7921b71 and the report commit)
+- [x] QA lenses round 4 (a, e on ad36216): every finding fixed (f470e34 and the report commit)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -31,7 +32,7 @@ Progress:
 | 1 | Public API reviewed for stability | PASS: 20 names kept from 0.2.0; signatures, defaults and return types pinned by `tests/test_contract_api.py`; changes in CHANGELOG |
 | 2 | `__all__` exact, no private imports in docs | PASS: `tests/test_contract.py`, `tests/test_docs_examples.py` |
 | 3 | Docstrings with runnable examples, doctests | PASS: 44 examples in 17 docstrings, pinned exactly, every public name covered; README (21) and GUIDE (37) results run as tests, counts pinned |
-| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel; integer parameters typed `SupportsIndex`, checked by `tests/test_typing.py` on every interpreter |
+| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel; integer parameters typed `SupportsIndex` for mypy and pyright (`Weekday(value)` included), checked by `tests/test_typing.py` on every interpreter and `tests/test_weekday_call.py` |
 | 5 | Typed, documented, bounded errors | PASS: `NoSuchDayError` (a `ValueError`), `ValueError`, `TypeError`; messages quote at most 40 characters and never print a huge integer |
 | 6 | Contract tests of every public name | PASS |
 | 7 | Real ground truth | PASS: 5 sources re-fetched 2026-10-24 (hashes unchanged), grammar read from the RFC text, `python-dateutil` and `calendar` oracles |
@@ -45,7 +46,7 @@ Progress:
 | 15 | Gates each exit 0 | PASS: see Gates |
 | 16 | Independent reviewer | pending (orchestrator) |
 | 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
-| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10; QA round 3 fixes 19 of 19 |
+| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10; QA round 3 fixes 19 of 19; QA round 4 fixes 7 of 7 |
 | 19 | Five independent QA lenses | pending (orchestrator) |
 
 ## Baseline on 0.2.0 (before any change)
@@ -401,3 +402,46 @@ stdout difference between them (4,079 on 057be74). Gates on the tree: `ruff form
 (487 passed) exit 0.
 
 Disputed findings (round 3): none.
+
+### Round 4
+
+Lenses (a) and (e) reviewed `release/1.0.0` at ad36216. Lens (a) found every round 3
+finding fixed and reported one gap; lens (e) found its five earlier findings killed and
+reported five surviving mutants out of 38 probes on the changed code (2 more proven
+equivalent). All six are fixed in f470e34. a-N1 was a defect: its contract
+(`test_the_call_types_its_value_as_supports_index`) was run on ad36216 with Python 3.13.2
+and failed there (`object` is not `SupportsIndex`); it passes now. e-N1 to e-N5 were
+missing contracts, not defects: their new cases pass on ad36216 and kill the lens's
+mutants (table below).
+
+| Lens | Id | Finding | Fix | Contract |
+| --- | --- | --- | --- | --- |
+| a | a-N1 | pyright reads `Weekday(value)` through the metaclass `__call__`, whose `value` was typed `object`, so `Weekday("MO")`, `Weekday(4.0)` and `Weekday(None)` passed pyright strict while the CHANGELOG and GUIDE said the parameter is `SupportsIndex` | the metaclass `__call__` types `value` as `SupportsIndex` (with an override ignore, as `EnumMeta.__call__` takes any value); the CHANGELOG entry says pyright now flags those calls. pyright 1.1.414 strict: the three calls give 3 errors (0 before), `Weekday(Index())`, `Weekday(3)`, `Weekday(Weekday.MONDAY)` and `Weekday(value=2)` give 0; pyright strict on `_weekday.py` reports no new error (one fewer: its old override error is gone) | `test_weekday_call.py::test_the_call_types_its_value_as_supports_index`; `test_typing.py` (mypy `--strict` over the source tree) also fails if the annotation goes back to `object`, as the ignore becomes unused |
+| e | e-N1 (C20) | that `-h` or `--version` still wins after `--yearly` was not pinned | none needed | `test_cli_options.py::test_the_first_of_help_and_version_wins_over_anything_else` (`--yearly --version`, `--yearly -h`, `--ye --vers`) |
+| e | e-N2 (C06, C08) | case-sensitive option matching was not pinned | none needed | `test_malformed_options_are_unrecognized_on_every_version` (`--YEARLY`, `--Help`, `-H`) |
+| e | e-N3 (C07) | refusal of an option with surrounding whitespace was not pinned | none needed | the same test (`--yearly `, `--h\t`, `-h `) |
+| e | e-N4 (C14) | the order of several unknown options in the message was not pinned | none needed | `test_cli_options.py::test_unknown_options_are_listed_in_the_order_given` (`-b -a 2026 MO -c` reports `'-b -a -c'`) |
+| e | e-N5 (C19) | the long-option guard was tested on the first option only | none needed | `test_cli_options.py::test_the_long_option_guard_reads_every_option` (`-q` then a 41-character option: `unrecognized option ... (41 characters)`) |
+
+Behaviour change, in the CHANGELOG 1.0.0 section: pyright now flags a value that is not
+an integer passed to `Weekday(value)`, as mypy already did. Nothing changes at run time.
+
+Mutants on these fixes, each applied alone to a copy of the tree with the fetched sources,
+the whole suite run with `-x` and a 300 s per-test limit on 3.13.2. U02 to U07 are lens
+(e)'s C20, C06, C08, C07, C14 and C19.
+
+| # | Mutation | Verdict | First test that failed |
+| --- | --- | --- | --- |
+| U01 | `Weekday` call value typed `object` again | killed | `test_typing.py::test_any_integer_type_type_checks_where_an_integer_is_asked_for` (and `test_weekday_call.py::test_the_call_types_its_value_as_supports_index`) |
+| U02 | only the first known option passed to argparse | killed | `test_cli_options.py::test_the_first_of_help_and_version_wins_over_anything_else[args7-version]` |
+| U03 | long option folded to lower case | killed | `test_cli_options.py::test_malformed_options_are_unrecognized_on_every_version[--YEARLY]` |
+| U04 | `-h` folded to lower case | killed | `test_cli_options.py::test_malformed_options_are_unrecognized_on_every_version[-H]` |
+| U05 | option stripped of whitespace | killed | `test_cli_options.py::test_malformed_options_are_unrecognized_on_every_version[--yearly ]` |
+| U06 | unknown options sorted | killed | `test_cli_options.py::test_unknown_options_are_listed_in_the_order_given` |
+| U07 | long-option guard on the first option only | killed | `test_cli_options.py::test_the_long_option_guard_reads_every_option` |
+
+Gates on the tree, under a machine turn on this PC with CPython 3.13.2: `ruff format
+--check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest`
+(499 passed) exit 0; `pytest -m e2e`: 2 passed.
+
+Disputed findings (round 4): none.
