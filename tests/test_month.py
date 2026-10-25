@@ -144,5 +144,5 @@ class _Index:
 
 
 def test_accepts_integer_types_through_index() -> None:
-    got = nth_weekday(_Index(2026), _Index(11), _Index(3), _Index(4))  # type: ignore[arg-type]
+    got = nth_weekday(_Index(2026), _Index(11), _Index(3), _Index(4))
     assert got == date(2026, 11, 26)

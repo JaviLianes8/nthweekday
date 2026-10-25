@@ -8,9 +8,12 @@ import sys
 from collections.abc import Sequence
 
 from ._byday import byday_dates
+from ._weekday import _QUOTE_LIMIT, quote
 
 _PERIOD = re.compile(r"([0-9]{4})(?:-([0-9]{2}))?")
 _SIGNED = re.compile(r"[+-][0-9]")
+_STAND_INS = ("period", "byday")
+_OPTIONS = ("--help", "--version", "--yearly")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -33,18 +36,51 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _split(args: Sequence[str]) -> tuple[list[str], list[str]]:
+    # One pass: everything after the first "--" is a value, and so is a signed BYDAY such
+    # as "-1FR", which argparse would read as an option.
+    flags: list[str] = []
+    values: list[str] = []
+    for at, arg in enumerate(args):
+        if arg == "--":
+            values.extend(args[at + 1 :])
+            break
+        is_flag = arg.startswith("-") and arg != "-" and not _SIGNED.match(arg)
+        (flags if is_flag else values).append(arg)
+    return flags, values
+
+
+def _option(flag: str) -> str | None:
+    # One rule on every Python version: -h, or a prefix of exactly one long option (none
+    # takes a value, so "--yearly=1" is no option). argparse read "-hx", "-=" and "--=x"
+    # differently before 3.12, and its "ambiguous option" error repeats the text unescaped.
+    if flag == "-h":
+        return "--help"
+    found = [option for option in _OPTIONS if option.startswith(flag)]
+    return found[0] if len(found) == 1 else None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the tool. Exit 0 when dates were printed, 1 when none matched, 2 on bad input."""
-    args = list(sys.argv[1:] if argv is None else argv)
-    # argparse reads "-1FR" as an option; a signed BYDAY is always a positional.
-    if "--" not in args and any(_SIGNED.match(a) for a in args):
-        flags = [a for a in args if a.startswith("-") and not _SIGNED.match(a)]
-        args = [*flags, "--", *(a for a in args if a not in flags)]
+    flags, values = _split(list(sys.argv[1:] if argv is None else argv))
     parser = _parser()
-    opts = parser.parse_args(args)
+    # argparse repeats an option it cannot read in full; no option is longer than 40.
+    for arg in flags:
+        if len(arg) > _QUOTE_LIMIT:
+            parser.error(f"unrecognized option {quote(arg)}")
+    extra = [flag for flag in dict.fromkeys(flags) if _option(flag) is None]
+    # argparse sees no text of the caller: the options it knows, each once and in the order
+    # given (so the first of -h and --version wins over anything else), and stand-ins for
+    # the values, so it still reports a missing one. Its handling of "--" changed in 3.12.
+    options = dict.fromkeys(option for option in map(_option, flags) if option is not None)
+    opts = parser.parse_known_args([*options, *_STAND_INS[: len(values)]])[0]
+    extra += values[len(_STAND_INS) :]
+    if extra:
+        parser.error(f"unrecognized arguments: {quote(' '.join(extra))}")
+    opts.period, opts.byday = values[: len(_STAND_INS)]
     period = _PERIOD.fullmatch(opts.period)
     if period is None:
-        parser.error(f"period must be YYYY or YYYY-MM, got {opts.period!r}")
+        parser.error(f"period must be YYYY or YYYY-MM, got {quote(opts.period)}")
     year, month = int(period[1]), period[2]
     if opts.yearly and month is not None:
         parser.error("--yearly takes a bare year, not YYYY-MM")
@@ -57,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         parser.error(str(exc))
     if not found:
-        print(f"nthweekday: {opts.byday} selects no date in {opts.period}", file=sys.stderr)
+        print(f"nthweekday: {quote(opts.byday)} selects no date in {opts.period}", file=sys.stderr)
         return 1
     sys.stdout.write("".join(f"{d.isoformat()}\n" for d in found))
     return 0

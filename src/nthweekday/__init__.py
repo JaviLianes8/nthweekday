@@ -6,14 +6,11 @@ from ._byday import ByDay, byday_dates, parse_byday
 from ._month import (
     NoSuchDayError,
     last_weekday,
-    next_weekday,
     nth_weekday,
     nth_weekday_in_year,
-    ordinal_of,
-    previous_weekday,
-    week_of_month,
     weekdays_in_month,
 )
+from ._relative import next_weekday, ordinal_of, previous_weekday, week_of_month
 from ._weekday import Weekday
 
 MONDAY = Weekday.MONDAY
@@ -24,7 +21,24 @@ FRIDAY = Weekday.FRIDAY
 SATURDAY = Weekday.SATURDAY
 SUNDAY = Weekday.SUNDAY
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"
+
+# The functions show and pickle as nthweekday.<name> and doctest finds them from the
+# package. The classes keep the module that defines them, where inspect.getsource looks.
+for _func in (
+    byday_dates,
+    last_weekday,
+    next_weekday,
+    nth_weekday,
+    nth_weekday_in_year,
+    ordinal_of,
+    parse_byday,
+    previous_weekday,
+    week_of_month,
+    weekdays_in_month,
+):
+    _func.__module__ = __name__
+del _func
 
 __all__ = [
     "FRIDAY",

@@ -6,7 +6,100 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.2.0]
+## [1.0.0] - 2026-10-25
+
+The public API is now stable: the twenty names in `nthweekday.__all__`, their parameter
+names, defaults, return types and error types follow Semantic Versioning from this
+release on. 0.2.0 was never published to PyPI, so 1.0.0 is the first release there.
+
+### Stable
+
+- Month queries: `nth_weekday`, `last_weekday` and `weekdays_in_month`.
+- Year queries: `nth_weekday_in_year`, counted as RFC 5545 counts BYDAY in a YEARLY rule.
+- Date queries: `ordinal_of`, `week_of_month`, `next_weekday` and `previous_weekday`.
+- RFC 5545 BYDAY: `parse_byday`, `ByDay` and `byday_dates`.
+- Weekdays: `Weekday` and the `MONDAY` to `SUNDAY` constants.
+- Errors: `NoSuchDayError` (a `ValueError`) when the day does not exist, `ValueError`
+  for an argument out of range or invalid text, `TypeError` for the wrong type.
+- The `nthweekday` command line tool and `python -m nthweekday`, with exit codes 0, 1
+  and 2.
+
+### Changed
+
+- `next_weekday` and `previous_weekday` raise `NoSuchDayError` instead of a plain
+  `ValueError` when the answer would fall outside the years 1 to 9999. Code that catches
+  `ValueError` is unaffected.
+- `byday_dates` raises `TypeError` with its own message for a value that is neither a
+  string, a `ByDay` nor an iterable (it let the error of `tuple()` through). It reads an
+  iterable value one entry at a time and raises `TypeError` at the first entry that is
+  not a `ByDay`, without reading the rest (it read the whole iterable first, so an
+  endless one never returned). An error raised by the caller's own iterable comes
+  through unchanged instead of being replaced by that message.
+- Error messages quote at most 40 characters of a text argument and describe a huge
+  integer by its size instead of printing it; before, a long BYDAY value or weekday name
+  was repeated in full, and an integer past 4300 digits failed while building the message.
+  A bad BYDAY entry is quoted once, with its place in a list (`invalid BYDAY entry 'XX'
+  (entry 2 of 3)`), instead of beside a second quote of the whole value.
+- `next_weekday`, `previous_weekday` and `ordinal_of` check their `strict` and
+  `from_end` flags: anything but a `bool` (or numpy's bool scalar) raises `TypeError`.
+  They were read by truth value, so `from_end="no"` counted from the end and
+  `strict=None` was taken as `False`.
+- The command line quotes the BYDAY value when it selects no date, and every error it
+  reports, including those about unknown options and extra arguments, quotes at most 40
+  characters of an argument.
+- The command line reads every argument after the first `--` as a value, and a signed
+  BYDAY such as `-1FR` as a value wherever it stands, on every Python version.
+  `nthweekday 2026-11 -1FR --` exited 2 on Python 3.10 to 3.13, and a second `--` (as in
+  `nthweekday 2026 -- --`) reached `byday_dates` as an empty list on 3.10 and 3.11, which
+  printed `[] selects no date` and exited 1; it is now an invalid BYDAY value, exit 2.
+  Sorting out the arguments takes time linear in their number (it was quadratic), and an
+  unknown option given several times is reported once.
+- The command line reads its options by one rule on every Python version: `-h`, and
+  `--help`, `--version` and `--yearly` or a prefix of them. Anything else that starts with
+  `-` is an unknown option, exit 2, quoted and escaped like every other argument. Before,
+  `-help` and `-hx` printed the help on Python 3.12 and later but exited 2 on 3.10 and
+  3.11, `--yearly=1` was refused as an option given a value, and `--=x` (and `-=x` on
+  3.12 and later) was reported as an ambiguous option with its text written unescaped,
+  terminal control characters included. When `-h` or `--version` is given, the first of
+  the two still wins over unknown options.
+- `Weekday(n)` checks `n` as the functions do: `bool`, `float` and `str` raise
+  `TypeError` (`Weekday(True)` gave `Weekday.TUESDAY` and `Weekday(4.0)` gave
+  `Weekday.FRIDAY`), and an integer out of range raises `ValueError` naming 0..6.
+  It takes exactly one argument: extra positional or keyword arguments raise
+  `TypeError`, so no form of the call skips the check or repeats a long text.
+  `inspect.signature(Weekday)` and `help(Weekday)` show `(value)` on every Python
+  version, and `Weekday(n)` is typed to return a `Weekday` for type checkers that read
+  the call's annotations (pyright saw `Any`).
+- `format()` of a `Weekday` follows one rule on every Python version: the name without a
+  spec, the number with one (`f"{FRIDAY:02d}"` is `04`). On Python 3.10 a spec used to
+  format the name, and `d` raised `ValueError`.
+- The integer parameters (`year`, `month`, `weekday`, `n`, `first_weekday`, `ByDay`'s
+  `weekday` and `ordinal`, `Weekday(value)` and `Weekday.from_iso(number)`) are typed
+  `typing.SupportsIndex` instead of `int`, so a numpy integer type-checks under mypy and
+  pyright as it already ran (`ByDay` was typed `weekday: Weekday` in 0.2.0, so a
+  `date.weekday()` value did not type-check either). This only widens the types. `ByDay`
+  still stores a `Weekday`. Both checkers flag a `str` or `float` passed to any of them,
+  and `None` passed to any of them but `byday_dates`' `month` and `ByDay`'s `ordinal`,
+  which take `None` by design. `Weekday(value)` is included: pyright reads that call
+  through the enum's metaclass, whose `value` is now typed `SupportsIndex` too (it took
+  any object, so pyright let `Weekday("MO")` through), and which type checkers see as
+  taking that one value and nothing else. So both checkers also flag `Weekday(3, 4)` and
+  `Weekday(3, module="x")`, which always raise `TypeError` (pyright let them through),
+  and both still accept an unpacked call that runs, such as `Weekday(*[3])` or
+  `Weekday(**{"value": 3})`.
+- numpy's bool scalar is refused like `bool` with numpy 1.x too (it has `__index__`
+  there).
+- A `str` subclass passed to `parse_byday` or `Weekday.parse` is read as its plain text;
+  its own methods (`__repr__`, `upper`, `split`) are no longer called.
+- The functions report `nthweekday` as their module, so pickles of them refer to
+  `nthweekday.<name>`. The classes keep the module that defines them, as in 0.2.0.
+
+### Added
+
+- Every public name has a docstring with an example that runs as a test.
+- A GUIDE describing every public name, the argument checks and the errors.
+
+## [0.2.0] - 2026-10-13
 
 ### Added
 
@@ -26,7 +119,12 @@ All notable changes to this project are documented here. The format follows
   raise `TypeError` instead of being accepted or failing later. Integer types other
   than `int` (such as numpy integers) are still accepted through `__index__`.
 
-## [0.1.0]
+## [0.1.0] - 2026-10-12
 
 - First release: `nth_weekday`, `last_weekday`, `week_of_month`,
   `weekdays_in_month`, and the `MONDAY` through `SUNDAY` constants.
+
+[Unreleased]: https://github.com/JaviLianes8/nthweekday/commits/main
+[1.0.0]: https://pypi.org/project/nthweekday/1.0.0/
+[0.2.0]: https://github.com/JaviLianes8/nthweekday/tree/5adde425cbd21cd33da7db1c011e4a6c6a067c8a
+[0.1.0]: https://github.com/JaviLianes8/nthweekday/tree/d26b8d67c848c2c96a8583996f286be4099951f8

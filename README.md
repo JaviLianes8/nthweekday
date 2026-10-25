@@ -1,5 +1,7 @@
 # nthweekday
 
+[![Lianes8 Certified](https://lianes8studio.com/certified/lianes8-certified-badge.svg)](https://lianes8studio.com/certified)
+
 Find the nth weekday of a month (third Thursday, last Friday), read RFC 5545 BYDAY values
 such as `-1FR` or `1SU,-1SU`, and answer the related calendar questions. Typed, zero
 dependencies.
@@ -72,9 +74,11 @@ Weekday.MONDAY.iso  # -> 1
 Weekday.THURSDAY.code  # -> 'TH'
 ```
 
-Every function checks its arguments: years 1 to 9999 (the range `datetime` supports),
-months 1 to 12, weekdays 0 to 6. Any integer type works (numpy integers included), while
-`bool`, `float` and `str` values are refused with `TypeError`.
+Every function, and `Weekday(n)`, checks its arguments: years 1 to 9999 (the range
+`datetime` supports), months 1 to 12, weekdays 0 to 6. Any integer type works (numpy
+integers included) and type-checks, as those parameters are typed `typing.SupportsIndex`,
+while `bool`, `float` and `str` values are refused with `TypeError`. The `strict` and
+`from_end` flags take a `bool` and refuse anything else with `TypeError`.
 
 ## RFC 5545 BYDAY
 
@@ -119,28 +123,56 @@ input. `python -m nthweekday` works the same.
 - Every (year, month, weekday, n) from 1990 to 2040, the year ordinals 1 to 53 at the
   calendar limits, and random BYDAY lists are compared with `python-dateutil`'s `rrule`,
   used only in the tests.
-- Selected worked examples of RFC 5545 (the BYDAY ordinal ones) are test vectors.
+- Every month of a whole 400-year Gregorian cycle (the calendar repeats after it), plus
+  the first and last centuries `datetime` supports, is compared with the rows of the
+  standard `calendar` module.
+- The BYDAY grammar is read out of the fetched RFC 5545 text and compared with
+  `parse_byday` on every string of up to five characters over a 12-character alphabet and
+  on 20,000 random lists; the BYDAY ordinal examples of RFC 5545 are test vectors.
 - The six US federal holidays defined by a weekday rule in 5 U.S.C. 6103 reproduce every
   date OPM published for 2011 to 2030. The UK Monday bank holidays (the late May and
   August ones from the Banking and Financial Dealings Act 1971, the early May one set
   each year by proclamation) reproduce the GOV.UK dates, apart from the two days moved
   by a special proclamation.
+- Seeded fuzz tests feed random and hostile text to the parser and the command line:
+  only `ValueError` or `TypeError` comes out, with messages that quote at most 40
+  characters of the input, in time linear in its length.
 - The upstream pages are not part of the repository: `python scripts/fetch_upstream.py`
   fetches them into `data/upstream/`, checked against the pinned manifest, and the tests
   that need them skip until then.
-- Every `# ->` line in this README is executed by the test suite.
+- Every `# ->` line in this README and in the
+  [GUIDE](https://github.com/JaviLianes8/nthweekday/blob/main/GUIDE.md), and every
+  docstring example, is executed by the test suite.
 
 ## Why
 
-The standard `calendar` module exposes `monthcalendar` and `monthrange`, but no direct
-"nth weekday" helper, so the third-Thursday and last-Friday logic that recurring events
-need gets rewritten by hand every time. `dateutil.rrule` covers it as part of a full
-recurrence engine; this library is the small, typed, dependency-free piece for when the
-question is just which day it is.
+The standard `calendar` module has `monthcalendar` and `monthrange` but no "nth weekday"
+function, so the third-Thursday and last-Friday logic that recurring events need gets
+rewritten by hand. `python-dateutil` covers it as part of a full recurrence engine, with
+different edges (checked with 2.9.0.post0):
+
+- `date(2026, 9, 1) + relativedelta(day=1, weekday=MO(5))` returns `2026-10-05`, a day in
+  the next month, where `nth_weekday(2026, 9, MONDAY, 5)` raises `NoSuchDayError`.
+- `rrule(MONTHLY, byweekday=[FR, FR(1)])` returns only the first Friday of each month,
+  where `byday_dates(year, month, "FR,1FR")` reads BYDAY as one list and returns every
+  Friday.
+- `rrule(MONTHLY, byweekday=[MO(20)])` raises `IndexError`; `byday_dates` returns no date
+  for a monthly ordinal past the fifth.
+
+`nthweekday` is the small, typed, zero-dependency piece for when the question is just
+which day it is, or which days a BYDAY value selects.
+
+## Documentation
+
+The [GUIDE](https://github.com/JaviLianes8/nthweekday/blob/main/GUIDE.md) describes every
+public name, the argument checks and the errors. The
+[CHANGELOG](https://github.com/JaviLianes8/nthweekday/blob/main/CHANGELOG.md) lists what
+changed in each release. From 1.0.0 on, the names in `nthweekday.__all__`, their
+signatures, defaults and error types follow Semantic Versioning.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/JaviLianes8/nthweekday/blob/main/LICENSE).
 
 ## Links
 

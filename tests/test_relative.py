@@ -1,4 +1,5 @@
 import calendar
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 
 import pytest
@@ -105,3 +106,33 @@ def test_relative_steps_past_the_calendar_limits_raise_value_error() -> None:
     with pytest.raises(ValueError, match="no Sunday before 0001-01-01"):
         previous_weekday(date(1, 1, 1), SUNDAY)
     assert next_weekday(date(9999, 12, 31), 4) == date(9999, 12, 31)
+
+
+@pytest.mark.parametrize("flag", ["no", "x", None, 1, 0, 1.0, [], date(2026, 1, 1)])
+def test_the_keyword_flags_take_a_bool_and_nothing_else(flag: object) -> None:
+    d = date(2026, 10, 12)
+    calls: list[tuple[Callable[[], object], str]] = [
+        (lambda: ordinal_of(d, from_end=flag), "from_end"),  # type: ignore[arg-type]
+        (lambda: next_weekday(d, MONDAY, strict=flag), "strict"),  # type: ignore[arg-type]
+        (lambda: previous_weekday(d, MONDAY, strict=flag), "strict"),  # type: ignore[arg-type]
+    ]
+    for call, name in calls:
+        with pytest.raises(TypeError) as caught:
+            call()
+        assert str(caught.value) == f"{name} must be a bool, got {type(flag).__name__}"
+
+
+def test_the_keyword_flags_are_checked_before_anything_is_computed() -> None:
+    with pytest.raises(TypeError, match="strict must be a bool"):
+        next_weekday(date(9999, 12, 31), SATURDAY, strict="yes")  # type: ignore[arg-type]
+    assert ordinal_of(date(2026, 10, 12), from_end=False) == 2
+    assert next_weekday(date(2026, 10, 12), MONDAY, strict=False) == date(2026, 10, 12)
+
+
+@pytest.mark.parametrize("name", ["bool_", "bool"])
+def test_the_keyword_flags_take_numpy_bool_scalars_as_bools(name: str) -> None:
+    # numpy's bool scalar is not a bool subclass but counts as one everywhere.
+    yes: object = type(name, (), {"__module__": "numpy", "__bool__": lambda self: True})()
+    d = date(2026, 10, 12)
+    assert ordinal_of(d, from_end=yes) == -3  # type: ignore[arg-type]
+    assert next_weekday(d, MONDAY, strict=yes) == date(2026, 10, 19)  # type: ignore[arg-type]

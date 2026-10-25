@@ -4,34 +4,46 @@ from __future__ import annotations
 
 import re
 from calendar import monthrange
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import SupportsIndex
 
 from ._month import NoSuchDayError, nth_weekday_in_year
-from ._weekday import Weekday, _int_in, check_month, check_weekday, check_year
+from ._weekday import Weekday, _int_in, check_month, check_weekday, check_year, quote
 
+_VALUE_TYPES = "value must be a BYDAY string, a ByDay or ByDay entries"
 # weekdaynum = [[plus / minus] ordwk] weekday, ordwk = 1*2DIGIT (1 to 53), RFC 5545 3.3.10.
 # Enumerated values are case-insensitive (RFC 5545 section 2), so the code is matched as such.
 _WEEKDAYNUM = re.compile(r"(?:([+-]?)([0-9]{1,2}))?(SU|MO|TU|WE|TH|FR|SA)", re.IGNORECASE)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class ByDay:
     """One BYDAY entry: a weekday, optionally with an ordinal (``-1FR`` is the last Friday).
 
-    ``ordinal`` is ``None`` for every such weekday in the period, or 1..53 / -53..-1.
-    ``str()`` gives the canonical RFC 5545 form.
+    ``weekday`` is 0..6 or a ``Weekday`` and is stored as a ``Weekday``. ``ordinal`` is
+    ``None`` for every such weekday in the period, or 1..53 / -53..-1.
+    ``str()`` gives the canonical RFC 5545 form. Frozen and hashable.
+
+    >>> from nthweekday import FRIDAY
+    >>> ByDay(FRIDAY, -1)
+    ByDay(Weekday.FRIDAY, -1)
+    >>> str(ByDay(FRIDAY, -1))
+    '-1FR'
+    >>> str(ByDay(FRIDAY))
+    'FR'
     """
 
     weekday: Weekday
     ordinal: int | None = None
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "weekday", check_weekday(self.weekday))
-        if self.ordinal is not None:
-            ordinal = _int_in("ordinal", self.ordinal, -53, 53, nonzero=True)
-            object.__setattr__(self, "ordinal", ordinal)
+    def __init__(self, weekday: SupportsIndex, ordinal: SupportsIndex | None = None) -> None:
+        # Written out so that any integer weekday type-checks while the field stays a Weekday.
+        object.__setattr__(self, "weekday", check_weekday(weekday))
+        if ordinal is not None:
+            ordinal = _int_in("ordinal", ordinal, -53, 53, nonzero=True)
+        object.__setattr__(self, "ordinal", ordinal)
 
     def __repr__(self) -> str:
         tail = "" if self.ordinal is None else f", {self.ordinal}"
@@ -45,32 +57,52 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
     """Parse a BYDAY value such as ``"1SU,-1SU"`` into ``ByDay`` entries, in order.
 
     Accepts exactly the RFC 5545 grammar: an optional sign and one or two digits for 1..53,
-    then a two-letter code. Raises ``ValueError`` on anything else, including spaces.
+    then a two-letter code, in any letter case. Raises ``ValueError`` on anything else,
+    including spaces and an empty value, and ``TypeError`` for a non-string.
+
+    >>> parse_byday("1SU,-1SU")
+    (ByDay(Weekday.SUNDAY, 1), ByDay(Weekday.SUNDAY, -1))
+    >>> parse_byday("+02mo")
+    (ByDay(Weekday.MONDAY, 2),)
     """
     if not isinstance(value, str):
         raise TypeError(f"BYDAY value must be a str, got {type(value).__name__}")
+    value = str.__str__(value)  # a str subclass is read as its plain text
+    items = value.split(",")
     entries = []
-    for item in value.split(","):
+    for at, item in enumerate(items, 1):
         # IGNORECASE folds some non-ASCII letters into codes (long s matches S).
         match = _WEEKDAYNUM.fullmatch(item) if item.isascii() else None
         if match is None:
-            raise ValueError(f"invalid BYDAY entry {item!r} in {value!r}")
+            # One quoted piece and its place: the whole value would be a second quote.
+            where = f" (entry {at} of {len(items)})" if len(items) > 1 else ""
+            raise ValueError(f"invalid BYDAY entry {quote(item)}{where}")
         sign, digits, code = match.groups()
         ordinal = None if digits is None else int(sign + digits)
         if ordinal is not None and not 1 <= abs(ordinal) <= 53:
-            raise ValueError(f"BYDAY ordinal must be 1..53, got {item!r}")
+            raise ValueError(f"BYDAY ordinal must be 1..53, got {quote(item)}")
         entries.append(ByDay(Weekday.parse(code), ordinal))
     return tuple(entries)
 
 
-def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDay]) -> list[date]:
+def byday_dates(
+    year: SupportsIndex, month: SupportsIndex | None, value: str | ByDay | Iterable[ByDay]
+) -> list[date]:
     """The dates a BYDAY value selects in one month, or in a whole year with ``month=None``.
 
     With a month this is the MONTHLY meaning: ``2MO`` is the second Monday of that month
     and an ordinal past the last occurrence selects nothing. With ``month=None`` it is the
     YEARLY meaning without BYMONTH: ``20MO`` is the twentieth Monday of the year.
     ``value`` is a BYDAY string, one ``ByDay`` or several (what ``parse_byday`` returns).
-    The result is sorted and has no duplicates.
+    The result is sorted and has no duplicates. Raises ``ValueError`` for a bad year,
+    month or BYDAY string and ``TypeError`` for arguments of the wrong type.
+
+    >>> [d.day for d in byday_dates(2026, 3, "1SU,-1SU")]
+    [1, 29]
+    >>> byday_dates(2026, 9, "5MO")
+    []
+    >>> byday_dates(1998, None, "20MO")
+    [datetime.date(1998, 5, 18)]
     """
     year = check_year(year)
     if month is not None:
@@ -80,9 +112,13 @@ def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDa
     elif isinstance(value, ByDay):
         entries = (value,)
     else:
-        entries = tuple(value)
-        if not all(isinstance(e, ByDay) for e in entries):
-            raise TypeError("value must be a BYDAY string, a ByDay or ByDay entries")
+        try:
+            items = iter(value)
+        except TypeError:
+            raise TypeError(_VALUE_TYPES) from None
+        # Read outside the try, so an error of the caller's own iterable comes through
+        # unchanged, and checked one by one, so a wrong entry stops the read at once.
+        entries = tuple(_checked(items))
     if month is None:
         start, end = date(year, 1, 1), date(year, 12, 31)
     else:
@@ -91,6 +127,13 @@ def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDa
     for entry in entries:
         found.update(_select(entry, year, month, start, end))
     return sorted(found)
+
+
+def _checked(items: Iterator[object]) -> Iterator[ByDay]:
+    for entry in items:
+        if not isinstance(entry, ByDay):
+            raise TypeError(_VALUE_TYPES)
+        yield entry
 
 
 def _select(entry: ByDay, year: int, month: int | None, start: date, end: date) -> list[date]:
