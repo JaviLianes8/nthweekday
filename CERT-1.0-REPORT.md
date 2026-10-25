@@ -23,6 +23,7 @@ Progress:
 - [x] QA lenses round 3 (a, c, e on 057be74): every finding fixed (9a5b316, 886daf0, 7921b71 and the report commit)
 - [x] QA lenses round 4 (a, e on ad36216): every finding fixed (f470e34 and the report commit)
 - [x] QA lenses round 5 (a, e on 558ce09): every finding fixed (47e6b79 and the report commit)
+- [x] QA lenses round 6 (a on ea1f46c): every finding fixed (6f41373 and the report commit)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -33,7 +34,7 @@ Progress:
 | 1 | Public API reviewed for stability | PASS: 20 names kept from 0.2.0; signatures, defaults and return types pinned by `tests/test_contract_api.py`; changes in CHANGELOG |
 | 2 | `__all__` exact, no private imports in docs | PASS: `tests/test_contract.py`, `tests/test_docs_examples.py` |
 | 3 | Docstrings with runnable examples, doctests | PASS: 44 examples in 17 docstrings, pinned exactly, every public name covered; README (21) and GUIDE (37) results run as tests, counts pinned |
-| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel; integer parameters typed `SupportsIndex` for mypy and pyright (`Weekday(value)` included), checked by `tests/test_typing.py` on every interpreter and `tests/test_weekday_call.py`; the calls both checkers must refuse (`Weekday(None)`, `Weekday("MO")`, `Weekday(4.0)`, extra arguments) pinned by `tests/test_typing.py` |
+| 4 | Typed end to end | PASS: `mypy --strict src tests`, `py.typed` shipped, a consumer script type-checks against the installed wheel; integer parameters typed `SupportsIndex` for mypy and pyright (`Weekday(value)` included), checked by `tests/test_typing.py` on every interpreter (mypy, and pyright when installed) and `tests/test_weekday_call.py`; an unpacked call such as `Weekday(*[3])` type-checks under both; the calls both checkers must refuse (`Weekday(None)`, `Weekday("MO")`, `Weekday(4.0)`, extra arguments) pinned by `tests/test_typing.py` |
 | 5 | Typed, documented, bounded errors | PASS: `NoSuchDayError` (a `ValueError`), `ValueError`, `TypeError`; messages quote at most 40 characters and never print a huge integer |
 | 6 | Contract tests of every public name | PASS |
 | 7 | Real ground truth | PASS: 5 sources re-fetched 2026-10-24 (hashes unchanged), grammar read from the RFC text, `python-dateutil` and `calendar` oracles |
@@ -484,3 +485,49 @@ Gates on the tree, under a machine turn on this PC with CPython 3.13.2: `ruff fo
 (501 passed) exit 0; `pytest -m e2e`: 2 passed.
 
 Disputed findings (round 5): none.
+
+### Round 6
+
+Lens (a) reviewed `release/1.0.0` at ea1f46c. It found N1, N2 and N3 fixed and reported
+one new finding (N4), fixed in 6f41373. N4 was a defect for pyright users: typing the metaclass
+`__call__`'s extra arguments `NoReturn` (47e6b79) made pyright refuse unpacked calls that
+run, which it accepted at 558ce09 and in 0.2.0. Its contracts were run on ea1f46c with
+the 3.13.2 venv that has pyright 1.1.414 and failed there:
+`test_pyright_accepts_what_runs` (4 `reportArgumentType` errors, one per unpacked call),
+`test_pyright_refuses_a_weekday_call_without_one_integer` (the extra arguments were
+refused as `reportArgumentType`, not as a call with too many arguments) and
+`test_type_checkers_see_a_call_of_one_value_and_nothing_else` (no checker-only
+signature). All three pass now.
+
+| Lens | Id | Finding | Fix | Contract |
+| --- | --- | --- | --- | --- |
+| a | N4 | the metaclass `__call__` typed its extras `*args: NoReturn, **kwargs: NoReturn`, so pyright strict and basic refused `Weekday(*[3])`, `Weekday(**{"value": 3})`, `Weekday(*vals)` and `Weekday(**kw)` (4 errors), which run and which mypy accepts; the CHANGELOG did not say so | under `if TYPE_CHECKING:` the metaclass declares `__call__(cls: type[_E], value: SupportsIndex) -> _E` with no extras; the run-time method, its annotations and its checks are unchanged in the `else:` branch. pyright 1.1.414 strict on lens (a)'s probes: the 4 unpacked calls 0 errors, `sweep_bad.py` 8 (every bad call, now as `reportCallIssue`), `arity.py` 4, `every_param.py` 16, `invalid.py` 7, `n1_repro.py` 3, `valid.py` 0, `sweep_ok.py` 0; mypy 2.4.0 `--strict` gives the same counts as before (sweep_bad 9 on 8 lines, the rest equal); `_weekday.py` keeps its one pre-existing pyright error; `inspect.signature(Weekday)` is still `(value)` and `Weekday(3, 4)` still raises `TypeError`. `_weekday.py` is 200 lines. The CHANGELOG says checkers see the call taking one value and nothing else, and both accept an unpacked call that runs | `tests/test_typing.py::test_pyright_accepts_what_runs` (pyright strict on the mypy caller, which now has the 4 unpacked calls) and `::test_pyright_refuses_a_weekday_call_without_one_integer` (each refused line, with pyright's rule), both skipped when pyright is not installed; `tests/test_weekday_call.py::test_type_checkers_see_a_call_of_one_value_and_nothing_else` reads the checker-only signature from the source and runs everywhere; the mypy caller in `test_typing.py` also holds the 4 unpacked calls |
+
+Behaviour change, in the CHANGELOG 1.0.0 section: none against 0.2.0 at run time;
+pyright accepts unpacked calls again, as it did in 0.2.0, while still refusing extra
+arguments.
+
+Mutants on this fix, each applied alone to a copy of the tree with the fetched sources,
+the whole suite run with `-x` and a 300 s per-test limit in the 3.13.2 venv with pyright.
+X01 to X06 were also run against `tests/test_weekday_call.py` alone with the gate's
+3.13.2 (no pyright): each killed by
+`test_type_checkers_see_a_call_of_one_value_and_nothing_else`.
+
+| # | Mutation | Verdict | First test that failed |
+| --- | --- | --- | --- |
+| X01 | checker-only call takes `*args: NoReturn, **kwargs: NoReturn` (ea1f46c) | killed | `test_typing.py::test_pyright_accepts_what_runs` |
+| X02 | checker-only call takes `*args: object` | killed | `test_typing.py::test_pyright_refuses_a_weekday_call_without_one_integer` |
+| X03 | checker-only call takes `**kwargs: object` | killed | `test_typing.py::test_pyright_refuses_a_weekday_call_without_one_integer` |
+| X04 | checker-only call value typed `object` | killed | `test_typing.py::test_pyright_refuses_a_weekday_call_without_one_integer` |
+| X05 | checker-only call value typed `SupportsIndex \| None` | killed | `test_typing.py::test_pyright_refuses_a_weekday_call_without_one_integer` |
+| X06 | checker-only call returns `int` | killed | `test_typing.py::test_pyright_accepts_what_runs` |
+| X07 | run-time call lets a keyword alone through | killed | `test_contract_edges.py::test_the_constructor_checks_its_argument_like_every_function` |
+
+Gates on the tree, under a machine turn on this PC with CPython 3.13.2: `ruff format
+--check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest`
+(502 passed, the 2 pyright tests skipped) exit 0; `pytest -m e2e`: 2 passed. The suite in
+the 3.13.2 venv with pyright 1.1.414: 504 passed. `test_typing.py`, `test_weekday_call.py`,
+`test_docs_examples.py`, `test_contract_api.py` and `test_contract.py` on 3.10.19 and
+3.14.2: 53 passed and 2 skipped (pyright not installed there) on each.
+
+Disputed findings (round 6): none.
