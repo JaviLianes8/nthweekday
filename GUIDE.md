@@ -50,10 +50,14 @@ Every function checks its arguments before it computes anything:
 | `n` in a month | 1 to 5 or -5 to -1 | `ValueError` |
 | `n` in a year, `ByDay.ordinal` | 1 to 53 or -53 to -1 | `ValueError` |
 | a date | `datetime.date` or `datetime.datetime` | `TypeError` |
+| `strict`, `from_end` | `True` or `False` | `TypeError` |
 
-Any integer type is accepted through `__index__` (numpy integers included). `bool`,
-`float` and `str` are refused with `TypeError`, since `True` as a month or `2.0` as an
-ordinal is a bug rather than intent; numpy's bool scalar counts as a `bool`. A `str`
+Any integer type is accepted through `__index__` (numpy integers included), and the
+integer parameters are typed `typing.SupportsIndex`, so such a value type-checks too.
+`bool`, `float` and `str` are refused with `TypeError`, since `True` as a month or `2.0`
+as an ordinal is a bug rather than intent; numpy's bool scalar counts as a `bool`. The
+flags `strict` and `from_end` are not read by truth value: anything but a `bool` (or
+numpy's bool scalar), such as `from_end="no"` or `strict=None`, raises `TypeError`. A `str`
 subclass is read as its plain text, without calling its own methods. Error messages
 quote at most 40 characters of a text argument, never print a huge integer in full, and
 never repeat the value of an argument of the wrong type.
@@ -154,11 +158,11 @@ from 1 to 53, then one of `SU`, `MO`, `TU`, `WE`, `TH`, `FR`, `SA` in any letter
 Spaces, empty entries, `0`, three digits and non-ASCII look-alike characters raise
 `ValueError`. It returns the entries in order, as a tuple of `ByDay`.
 
-`ByDay(weekday, ordinal=None)` is a frozen, hashable dataclass. `weekday` is typed `int`,
-so a `date.weekday()` value or a `Weekday` both type-check; it checks both fields as in
-the table above and stores a `Weekday` and an `int`. `str()` writes the canonical
-form (no `+`, no leading zero, upper case), which `parse_byday` reads back to an equal
-value.
+`ByDay(weekday, ordinal=None)` is a frozen, hashable dataclass. `weekday` is typed
+`SupportsIndex`, so a `date.weekday()` value, a `Weekday` or a numpy integer type-checks;
+it checks both fields as in the table above and stores a `Weekday` and an `int`. `str()`
+writes the canonical form (no `+`, no leading zero, upper case), which `parse_byday` reads
+back to an equal value.
 
 `byday_dates(year, month, value)` takes a BYDAY string, one `ByDay` or an iterable of
 them, and returns the dates selected, sorted and without duplicates:
@@ -182,9 +186,14 @@ nthweekday --yearly 1998 20MO     # ordinals counted within the year
 ```
 
 A signed value such as `-1FR` is never taken for an option, and every argument after
-the first `--` is read as a value. It exits 0 when it printed dates, 1 when the value
-selects nothing in that period, and 2 on bad input, with the reason on standard error.
-That reason quotes at most 40 characters of any argument.
+the first `--` is read as a value. The options are `-h`, and `--help`, `--version` and
+`--yearly` or any prefix of them such as `--y`; none takes a value. Anything else that
+starts with `-`, such as `-help`, `-hx`, `--yearly=1` or `--=x`, is an unknown option,
+the same on every Python version. When `-h` or `--version` is given, the first of the two
+wins over unknown options and missing values. The tool exits 0 when it printed dates, 1
+when the value selects nothing in that period, and 2 on bad input, with the reason on
+standard error. That reason quotes at most 40 characters of any argument, escaped as a
+Python string literal, so it never writes a control character to the terminal.
 
 ## Stability
 

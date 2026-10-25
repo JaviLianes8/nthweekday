@@ -7,6 +7,7 @@ from calendar import monthrange
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import SupportsIndex
 
 from ._month import NoSuchDayError, nth_weekday_in_year
 from ._weekday import Weekday, _int_in, check_month, check_weekday, check_year, quote
@@ -37,8 +38,8 @@ class ByDay:
     weekday: Weekday
     ordinal: int | None = None
 
-    def __init__(self, weekday: int, ordinal: int | None = None) -> None:
-        # Written out so that an int weekday type-checks while the field stays a Weekday.
+    def __init__(self, weekday: SupportsIndex, ordinal: SupportsIndex | None = None) -> None:
+        # Written out so that any integer weekday type-checks while the field stays a Weekday.
         object.__setattr__(self, "weekday", check_weekday(weekday))
         if ordinal is not None:
             ordinal = _int_in("ordinal", ordinal, -53, 53, nonzero=True)
@@ -67,12 +68,15 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
     if not isinstance(value, str):
         raise TypeError(f"BYDAY value must be a str, got {type(value).__name__}")
     value = str.__str__(value)  # a str subclass is read as its plain text
+    items = value.split(",")
     entries = []
-    for item in value.split(","):
+    for at, item in enumerate(items, 1):
         # IGNORECASE folds some non-ASCII letters into codes (long s matches S).
         match = _WEEKDAYNUM.fullmatch(item) if item.isascii() else None
         if match is None:
-            raise ValueError(f"invalid BYDAY entry {quote(item)} in {quote(value)}")
+            # One quoted piece and its place: the whole value would be a second quote.
+            where = f" (entry {at} of {len(items)})" if len(items) > 1 else ""
+            raise ValueError(f"invalid BYDAY entry {quote(item)}{where}")
         sign, digits, code = match.groups()
         ordinal = None if digits is None else int(sign + digits)
         if ordinal is not None and not 1 <= abs(ordinal) <= 53:
@@ -81,7 +85,9 @@ def parse_byday(value: str) -> tuple[ByDay, ...]:
     return tuple(entries)
 
 
-def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDay]) -> list[date]:
+def byday_dates(
+    year: SupportsIndex, month: SupportsIndex | None, value: str | ByDay | Iterable[ByDay]
+) -> list[date]:
     """The dates a BYDAY value selects in one month, or in a whole year with ``month=None``.
 
     With a month this is the MONTHLY meaning: ``2MO`` is the second Monday of that month

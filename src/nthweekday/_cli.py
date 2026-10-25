@@ -13,6 +13,7 @@ from ._weekday import _QUOTE_LIMIT, quote
 _PERIOD = re.compile(r"([0-9]{4})(?:-([0-9]{2}))?")
 _SIGNED = re.compile(r"[+-][0-9]")
 _STAND_INS = ("period", "byday")
+_OPTIONS = ("--help", "--version", "--yearly")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -49,6 +50,16 @@ def _split(args: Sequence[str]) -> tuple[list[str], list[str]]:
     return flags, values
 
 
+def _option(flag: str) -> str | None:
+    # One rule on every Python version: -h, or a non-empty prefix of a long option without
+    # "=", as none takes a value. argparse read "-hx", "-=" and "--=x" differently before
+    # 3.12, and its "ambiguous option" error repeats the text unescaped.
+    if flag == "-h":
+        return "--help"
+    found = [o for o in _OPTIONS if o.startswith(flag)]
+    return found[0] if flag[2:] and "=" not in flag and len(found) == 1 else None
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the tool. Exit 0 when dates were printed, 1 when none matched, 2 on bad input."""
     flags, values = _split(list(sys.argv[1:] if argv is None else argv))
@@ -57,15 +68,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     for arg in flags:
         if len(arg) > _QUOTE_LIMIT:
             parser.error(f"unrecognized option {quote(arg)}")
-    # Before 3.12 argparse takes time quadratic in the number of options, so each distinct
-    # one is read on its own, in order, so -h still prints the help next to an unknown one.
-    known: list[str] = []
-    extra: list[str] = []
-    for flag in dict.fromkeys(flags):
-        (extra if parser.parse_known_args([flag, *_STAND_INS])[1] else known).append(flag)
-    # The values never reach argparse, whose handling of "--" changed in 3.12: it sees
-    # stand-ins, so it still reports a missing value, and the values are read here.
-    opts = parser.parse_known_args([*known, *_STAND_INS[: len(values)]])[0]
+    extra = [flag for flag in dict.fromkeys(flags) if _option(flag) is None]
+    # argparse sees no text of the caller: the options it knows, each once and in the order
+    # given (so the first of -h and --version wins over anything else), and stand-ins for
+    # the values, so it still reports a missing one. Its handling of "--" changed in 3.12.
+    options = dict.fromkeys(option for option in map(_option, flags) if option is not None)
+    opts = parser.parse_known_args([*options, *_STAND_INS[: len(values)]])[0]
     extra += values[len(_STAND_INS) :]
     if extra:
         parser.error(f"unrecognized arguments: {quote(' '.join(extra))}")

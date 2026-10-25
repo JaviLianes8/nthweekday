@@ -6,7 +6,7 @@ import inspect
 import operator
 from datetime import MAXYEAR, MINYEAR, date
 from enum import EnumMeta, IntEnum
-from typing import TypeVar
+from typing import TYPE_CHECKING, SupportsIndex, TypeVar
 
 _CODES = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
 # Error messages quote at most this many characters of what the caller passed.
@@ -62,6 +62,10 @@ class Weekday(IntEnum, metaclass=_CheckedEnumType):
     SATURDAY = 5
     SUNDAY = 6
 
+    if TYPE_CHECKING:  # mypy reads Weekday(n) through __new__, which IntEnum types as int
+
+        def __new__(cls, value: SupportsIndex) -> Weekday: ...
+
     def __repr__(self) -> str:
         return f"Weekday.{self.name}"
 
@@ -92,7 +96,7 @@ class Weekday(IntEnum, metaclass=_CheckedEnumType):
         return _CODES[self.value]
 
     @classmethod
-    def from_iso(cls, number: int) -> Weekday:
+    def from_iso(cls, number: SupportsIndex) -> Weekday:
         """The weekday with ISO number ``number`` (1 is Monday, 7 is Sunday).
 
         >>> Weekday.from_iso(1)

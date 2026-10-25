@@ -38,16 +38,30 @@ release on. 0.2.0 was never published to PyPI, so 1.0.0 is the first release the
 - Error messages quote at most 40 characters of a text argument and describe a huge
   integer by its size instead of printing it; before, a long BYDAY value or weekday name
   was repeated in full, and an integer past 4300 digits failed while building the message.
+  A bad BYDAY entry is quoted once, with its place in a list (`invalid BYDAY entry 'XX'
+  (entry 2 of 3)`), instead of beside a second quote of the whole value.
+- `next_weekday`, `previous_weekday` and `ordinal_of` check their `strict` and
+  `from_end` flags: anything but a `bool` (or numpy's bool scalar) raises `TypeError`.
+  They were read by truth value, so `from_end="no"` counted from the end and
+  `strict=None` was taken as `False`.
 - The command line quotes the BYDAY value when it selects no date, and every error it
   reports, including those about unknown options and extra arguments, quotes at most 40
   characters of an argument.
 - The command line reads every argument after the first `--` as a value, and a signed
   BYDAY such as `-1FR` as a value wherever it stands, on every Python version.
   `nthweekday 2026-11 -1FR --` exited 2 on Python 3.10 to 3.13, and a second `--` (as in
-  `nthweekday 2026 -- --`) crashed with a traceback and exit 1 on 3.10 and 3.11; it is
-  now an invalid BYDAY value, exit 2. Sorting out the arguments takes time linear in
-  their number (it was quadratic), and an unknown option given several times is
-  reported once.
+  `nthweekday 2026 -- --`) reached `byday_dates` as an empty list on 3.10 and 3.11, which
+  printed `[] selects no date` and exited 1; it is now an invalid BYDAY value, exit 2.
+  Sorting out the arguments takes time linear in their number (it was quadratic), and an
+  unknown option given several times is reported once.
+- The command line reads its options by one rule on every Python version: `-h`, and
+  `--help`, `--version` and `--yearly` or a prefix of them. Anything else that starts with
+  `-` is an unknown option, exit 2, quoted and escaped like every other argument. Before,
+  `-help` and `-hx` printed the help on Python 3.12 and later but exited 2 on 3.10 and
+  3.11, `--yearly=1` was refused as an option given a value, and `--=x` (and `-=x` on
+  3.12 and later) was reported as an ambiguous option with its text written unescaped,
+  terminal control characters included. When `-h` or `--version` is given, the first of
+  the two still wins over unknown options.
 - `Weekday(n)` checks `n` as the functions do: `bool`, `float` and `str` raise
   `TypeError` (`Weekday(True)` gave `Weekday.TUESDAY` and `Weekday(4.0)` gave
   `Weekday.FRIDAY`), and an integer out of range raises `ValueError` naming 0..6.
@@ -59,8 +73,12 @@ release on. 0.2.0 was never published to PyPI, so 1.0.0 is the first release the
 - `format()` of a `Weekday` follows one rule on every Python version: the name without a
   spec, the number with one (`f"{FRIDAY:02d}"` is `04`). On Python 3.10 a spec used to
   format the name, and `d` raised `ValueError`.
-- `ByDay` takes `weekday: int` in its signature, so a `date.weekday()` value type-checks;
-  it accepted one at run time already and still stores a `Weekday`.
+- The integer parameters (`year`, `month`, `weekday`, `n`, `first_weekday`, `ByDay`'s
+  `weekday` and `ordinal`, `Weekday(value)` and `Weekday.from_iso(number)`) are typed
+  `typing.SupportsIndex` instead of `int`, so a numpy integer type-checks under mypy and
+  pyright as it already ran (`ByDay` was typed `weekday: Weekday` in 0.2.0, so a
+  `date.weekday()` value did not type-check either). This only widens the types. `ByDay`
+  still stores a `Weekday`.
 - numpy's bool scalar is refused like `bool` with numpy 1.x too (it has `__index__`
   there).
 - A `str` subclass passed to `parse_byday` or `Weekday.parse` is read as its plain text;

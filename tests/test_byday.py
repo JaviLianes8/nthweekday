@@ -91,7 +91,7 @@ def test_byday_normalises_index_integers_to_int() -> None:
         def __index__(self) -> int:
             return 2
 
-    entry = ByDay(Index(), Index())  # type: ignore[arg-type]
+    entry = ByDay(Index(), Index())
     assert entry == ByDay(Weekday.WEDNESDAY, 2) and str(entry) == "2WE"
     assert type(entry.ordinal) is int and entry.weekday is Weekday.WEDNESDAY
 
@@ -164,6 +164,12 @@ def test_byday_dates_lets_errors_of_the_callers_iterable_through() -> None:
     with pytest.raises(TypeError, match="bug in the caller") as caught:
         byday_dates(2026, 10, entries())
     assert not caught.value.__suppress_context__
+
+
+def test_byday_dates_hides_the_internal_error_of_a_value_that_is_not_iterable() -> None:
+    with pytest.raises(TypeError, match="ByDay entries") as caught:
+        byday_dates(2026, 1, 5)  # type: ignore[arg-type]
+    assert caught.value.__suppress_context__
 
 
 def test_byday_dates_stops_at_the_first_entry_of_the_wrong_type() -> None:

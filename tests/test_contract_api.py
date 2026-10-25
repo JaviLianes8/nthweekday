@@ -30,18 +30,19 @@ from nthweekday import (
     weekdays_in_month,
 )
 
+IDX = "SupportsIndex"
 SIGNATURES = {
-    "byday_dates": "(year: 'int', month: 'int | None', "
+    "byday_dates": f"(year: '{IDX}', month: '{IDX} | None', "
     "value: 'str | ByDay | Iterable[ByDay]') -> 'list[date]'",
-    "last_weekday": "(year: 'int', month: 'int', weekday: 'int') -> 'date'",
-    "next_weekday": "(d: 'date', weekday: 'int', *, strict: 'bool' = False) -> 'date'",
-    "nth_weekday": "(year: 'int', month: 'int', weekday: 'int', n: 'int') -> 'date'",
-    "nth_weekday_in_year": "(year: 'int', weekday: 'int', n: 'int') -> 'date'",
+    "last_weekday": f"(year: '{IDX}', month: '{IDX}', weekday: '{IDX}') -> 'date'",
+    "next_weekday": f"(d: 'date', weekday: '{IDX}', *, strict: 'bool' = False) -> 'date'",
+    "nth_weekday": f"(year: '{IDX}', month: '{IDX}', weekday: '{IDX}', n: '{IDX}') -> 'date'",
+    "nth_weekday_in_year": f"(year: '{IDX}', weekday: '{IDX}', n: '{IDX}') -> 'date'",
     "ordinal_of": "(d: 'date', *, from_end: 'bool' = False) -> 'int'",
     "parse_byday": "(value: 'str') -> 'tuple[ByDay, ...]'",
-    "previous_weekday": "(d: 'date', weekday: 'int', *, strict: 'bool' = False) -> 'date'",
-    "week_of_month": "(d: 'date', first_weekday: 'int' = Weekday.MONDAY) -> 'int'",
-    "weekdays_in_month": "(year: 'int', month: 'int', weekday: 'int') -> 'list[date]'",
+    "previous_weekday": f"(d: 'date', weekday: '{IDX}', *, strict: 'bool' = False) -> 'date'",
+    "week_of_month": f"(d: 'date', first_weekday: '{IDX}' = Weekday.MONDAY) -> 'int'",
+    "weekdays_in_month": f"(year: '{IDX}', month: '{IDX}', weekday: '{IDX}') -> 'list[date]'",
 }
 
 
@@ -52,7 +53,7 @@ def test_function_signatures_are_pinned(name: str) -> None:
 
 def test_class_signatures_are_pinned() -> None:
     assert str(inspect.signature(ByDay)) == (
-        "(weekday: 'int', ordinal: 'int | None' = None) -> 'None'"
+        f"(weekday: '{IDX}', ordinal: '{IDX} | None' = None) -> 'None'"
     )
     assert [(m.name, m.value) for m in Weekday] == [
         ("MONDAY", 0),
@@ -64,7 +65,7 @@ def test_class_signatures_are_pinned() -> None:
         ("SUNDAY", 6),
     ]
     assert str(inspect.signature(Weekday.parse)) == "(text: 'str') -> 'Weekday'"
-    assert str(inspect.signature(Weekday.from_iso)) == "(number: 'int') -> 'Weekday'"
+    assert str(inspect.signature(Weekday.from_iso)) == f"(number: '{IDX}') -> 'Weekday'"
 
 
 def test_functions_report_the_package_and_classes_their_defining_module() -> None:
@@ -162,10 +163,30 @@ def test_messages_quote_at_most_40_characters_and_no_huge_number() -> None:
     assert str(caught.value) == "unknown weekday name '" + "x" * 40 + "'"
     with pytest.raises(ValueError) as caught:
         parse_byday(chr(0xD800) * 30)
-    assert str(caught.value).count(r"\ud800") == 2 * 13
+    assert str(caught.value).count(r"\ud800") == 13
     with pytest.raises(ValueError) as caught:
         nth_weekday(2026, 1, MONDAY, 10**18 - 1)
     assert str(caught.value).endswith(f"got {10**18 - 1}")
     with pytest.raises(ValueError) as caught:
         nth_weekday(2026, 1, MONDAY, -(10**18))
     assert str(caught.value) == "n must be in 1..5 or -5..-1, got an integer of 60 bits"
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("XX", "invalid BYDAY entry 'XX'"),
+        ("MO,XX,FR", "invalid BYDAY entry 'XX' (entry 2 of 3)"),
+        (
+            "MO," * 20 + "Z" * 52,
+            "invalid BYDAY entry '" + "Z" * 40 + "'... (52 characters) (entry 21 of 21)",
+        ),
+        ("x" * 1000, "invalid BYDAY entry '" + "x" * 40 + "'... (1000 characters)"),
+    ],
+    ids=["one", "list", "long-entry", "long-value"],
+)
+def test_a_bad_byday_entry_is_quoted_once_with_its_position(value: str, message: str) -> None:
+    # One quoted piece of at most 40 characters; the whole value is not quoted beside it.
+    with pytest.raises(ValueError) as caught:
+        parse_byday(value)
+    assert str(caught.value) == message

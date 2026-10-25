@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import calendar
 from datetime import date, timedelta
+from typing import SupportsIndex
 
 from ._weekday import Weekday, _int_in, check_month, check_weekday, check_year
 
@@ -49,7 +50,9 @@ def _month_days(year: int, month: int, weekday: Weekday) -> range:
     return range(1 + (weekday - first) % 7, length + 1, 7)
 
 
-def weekdays_in_month(year: int, month: int, weekday: int) -> list[date]:
+def weekdays_in_month(
+    year: SupportsIndex, month: SupportsIndex, weekday: SupportsIndex
+) -> list[date]:
     """Every date in the month that falls on ``weekday`` (Monday=0), in order.
 
     >>> from nthweekday import MONDAY
@@ -60,7 +63,9 @@ def weekdays_in_month(year: int, month: int, weekday: int) -> list[date]:
     return [date(year, month, d) for d in _month_days(year, month, day)]
 
 
-def nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+def nth_weekday(
+    year: SupportsIndex, month: SupportsIndex, weekday: SupportsIndex, n: SupportsIndex
+) -> date:
     """The ``n``-th ``weekday`` of the month (Monday=0).
 
     ``n`` is 1..5 counting from the start or -1..-5 counting from the end (-1 is the
@@ -80,7 +85,7 @@ def nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
     return date(year, month, _pick(_month_days(year, month, day), n, where, day))
 
 
-def last_weekday(year: int, month: int, weekday: int) -> date:
+def last_weekday(year: SupportsIndex, month: SupportsIndex, weekday: SupportsIndex) -> date:
     """The last ``weekday`` of the month (Monday=0); every month has one.
 
     >>> from nthweekday import MONDAY
@@ -90,7 +95,7 @@ def last_weekday(year: int, month: int, weekday: int) -> date:
     return nth_weekday(year, month, weekday, -1)
 
 
-def nth_weekday_in_year(year: int, weekday: int, n: int) -> date:
+def nth_weekday_in_year(year: SupportsIndex, weekday: SupportsIndex, n: SupportsIndex) -> date:
     """The ``n``-th ``weekday`` of the year, as RFC 5545 counts BYDAY in a YEARLY rule.
 
     ``n`` is 1..53 or -53..-1. Raises ``NoSuchDayError`` for a 53rd occurrence in a

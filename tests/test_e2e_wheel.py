@@ -23,6 +23,13 @@ from datetime import date
 
 from nthweekday import THURSDAY, ByDay, Weekday, byday_dates, nth_weekday, parse_byday
 
+
+class Index:
+    def __index__(self) -> int:
+        return 4
+
+
+assert Weekday(Index()) is ByDay(Index(), Index()).weekday is Weekday.FRIDAY
 day: date = nth_weekday(2026, 11, THURSDAY, 4)
 days: list[date] = byday_dates(2026, 3, "1SU,-1SU")
 entries: tuple[ByDay, ...] = parse_byday("-1FR")

@@ -76,7 +76,9 @@ Weekday.THURSDAY.code  # -> 'TH'
 
 Every function, and `Weekday(n)`, checks its arguments: years 1 to 9999 (the range
 `datetime` supports), months 1 to 12, weekdays 0 to 6. Any integer type works (numpy
-integers included), while `bool`, `float` and `str` values are refused with `TypeError`.
+integers included) and type-checks, as those parameters are typed `typing.SupportsIndex`,
+while `bool`, `float` and `str` values are refused with `TypeError`. The `strict` and
+`from_end` flags take a `bool` and refuse anything else with `TypeError`.
 
 ## RFC 5545 BYDAY
 
