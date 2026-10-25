@@ -12,6 +12,7 @@ from ._weekday import _QUOTE_LIMIT, quote
 
 _PERIOD = re.compile(r"([0-9]{4})(?:-([0-9]{2}))?")
 _SIGNED = re.compile(r"[+-][0-9]")
+_STAND_INS = ("period", "byday")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -34,21 +35,41 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _split(args: Sequence[str]) -> tuple[list[str], list[str]]:
+    # One pass: everything after the first "--" is a value, and so is a signed BYDAY such
+    # as "-1FR", which argparse would read as an option.
+    flags: list[str] = []
+    values: list[str] = []
+    for at, arg in enumerate(args):
+        if arg == "--":
+            values.extend(args[at + 1 :])
+            break
+        is_flag = arg.startswith("-") and arg != "-" and not _SIGNED.match(arg)
+        (flags if is_flag else values).append(arg)
+    return flags, values
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the tool. Exit 0 when dates were printed, 1 when none matched, 2 on bad input."""
-    args = list(sys.argv[1:] if argv is None else argv)
-    # argparse reads "-1FR" as an option; a signed BYDAY is always a positional.
-    if "--" not in args and any(_SIGNED.match(a) for a in args):
-        flags = [a for a in args if a.startswith("-") and not _SIGNED.match(a)]
-        args = [*flags, "--", *(a for a in args if a not in flags)]
+    flags, values = _split(list(sys.argv[1:] if argv is None else argv))
     parser = _parser()
     # argparse repeats an option it cannot read in full; no option is longer than 40.
-    for arg in args[: args.index("--")] if "--" in args else args:
-        if arg.startswith("-") and len(arg) > _QUOTE_LIMIT and not _SIGNED.match(arg):
+    for arg in flags:
+        if len(arg) > _QUOTE_LIMIT:
             parser.error(f"unrecognized option {quote(arg)}")
-    opts, extra = parser.parse_known_args(args)
+    # Before 3.12 argparse takes time quadratic in the number of options, so each distinct
+    # one is read on its own, in order, so -h still prints the help next to an unknown one.
+    known: list[str] = []
+    extra: list[str] = []
+    for flag in dict.fromkeys(flags):
+        (extra if parser.parse_known_args([flag, *_STAND_INS])[1] else known).append(flag)
+    # The values never reach argparse, whose handling of "--" changed in 3.12: it sees
+    # stand-ins, so it still reports a missing value, and the values are read here.
+    opts = parser.parse_known_args([*known, *_STAND_INS[: len(values)]])[0]
+    extra += values[len(_STAND_INS) :]
     if extra:
         parser.error(f"unrecognized arguments: {quote(' '.join(extra))}")
+    opts.period, opts.byday = values[: len(_STAND_INS)]
     period = _PERIOD.fullmatch(opts.period)
     if period is None:
         parser.error(f"period must be YYYY or YYYY-MM, got {quote(opts.period)}")

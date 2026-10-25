@@ -181,9 +181,10 @@ nthweekday 2026 -1FR              # each month of 2026
 nthweekday --yearly 1998 20MO     # ordinals counted within the year
 ```
 
-A signed value such as `-1FR` is never taken for an option. It exits 0 when it printed
-dates, 1 when the value selects nothing in that period, and 2 on bad input, with the
-reason on standard error. That reason quotes at most 40 characters of any argument.
+A signed value such as `-1FR` is never taken for an option, and every argument after
+the first `--` is read as a value. It exits 0 when it printed dates, 1 when the value
+selects nothing in that period, and 2 on bad input, with the reason on standard error.
+That reason quotes at most 40 characters of any argument.
 
 ## Stability
 

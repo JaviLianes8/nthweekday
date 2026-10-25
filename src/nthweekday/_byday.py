@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from calendar import monthrange
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -107,11 +107,12 @@ def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDa
         entries = (value,)
     else:
         try:
-            entries = tuple(value)
+            items = iter(value)
         except TypeError:
             raise TypeError(_VALUE_TYPES) from None
-        if not all(isinstance(e, ByDay) for e in entries):
-            raise TypeError(_VALUE_TYPES)
+        # Read outside the try, so an error of the caller's own iterable comes through
+        # unchanged, and checked one by one, so a wrong entry stops the read at once.
+        entries = tuple(_checked(items))
     if month is None:
         start, end = date(year, 1, 1), date(year, 12, 31)
     else:
@@ -120,6 +121,13 @@ def byday_dates(year: int, month: int | None, value: str | ByDay | Iterable[ByDa
     for entry in entries:
         found.update(_select(entry, year, month, start, end))
     return sorted(found)
+
+
+def _checked(items: Iterator[object]) -> Iterator[ByDay]:
+    for entry in items:
+        if not isinstance(entry, ByDay):
+            raise TypeError(_VALUE_TYPES)
+        yield entry
 
 
 def _select(entry: ByDay, year: int, month: int | None, start: date, end: date) -> list[date]:

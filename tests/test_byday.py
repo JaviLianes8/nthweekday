@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import itertools
+from collections.abc import Iterator
 from datetime import date
 
 import pytest
@@ -150,3 +154,30 @@ def test_byday_dates_rejects_bad_period() -> None:
         byday_dates(0, None, "MO")
     with pytest.raises(TypeError):
         byday_dates(2026, True, "MO")
+
+
+def test_byday_dates_lets_errors_of_the_callers_iterable_through() -> None:
+    def entries() -> Iterator[ByDay]:
+        yield ByDay(FRIDAY, 1)
+        raise TypeError("bug in the caller")
+
+    with pytest.raises(TypeError, match="bug in the caller") as caught:
+        byday_dates(2026, 10, entries())
+    assert not caught.value.__suppress_context__
+
+
+def test_byday_dates_stops_at_the_first_entry_of_the_wrong_type() -> None:
+    with pytest.raises(TypeError, match="ByDay entries"):
+        byday_dates(2026, 1, itertools.count())  # type: ignore[arg-type]
+    pulled = iter([ByDay(MONDAY), "MO", ByDay(SUNDAY)])
+    with pytest.raises(TypeError, match="ByDay entries"):
+        byday_dates(2026, 1, pulled)  # type: ignore[arg-type]
+    assert next(pulled) == ByDay(SUNDAY)
+
+
+@pytest.mark.parametrize("value", ["MO", ByDay(MONDAY), [ByDay(MONDAY)]])
+def test_byday_dates_checks_a_falsy_month(value: str | ByDay | list[ByDay]) -> None:
+    with pytest.raises(TypeError, match="month must be an int, got bool"):
+        byday_dates(2026, False, value)
+    with pytest.raises(ValueError, match=r"month must be in 1\.\.12, got 0$"):
+        byday_dates(2026, 0, value)

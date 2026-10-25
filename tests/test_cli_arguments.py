@@ -1,0 +1,89 @@
+"""How the command line splits its arguments: options, values, and the first ``--``."""
+
+from __future__ import annotations
+
+import contextlib
+import io
+import time
+from collections.abc import Callable
+
+import pytest
+
+from nthweekday._cli import main
+
+
+def _run(capsys: pytest.CaptureFixture[str], *args: str) -> tuple[int, str, str]:
+    try:
+        code = main(list(args))
+    except SystemExit as exc:
+        code = int(exc.code or 0)
+    out, err = capsys.readouterr()
+    return code, out, err
+
+
+def test_a_signed_byday_before_a_double_dash_is_still_a_value(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert _run(capsys, "2026-11", "-1FR", "--") == (0, "2026-11-27\n", "")
+    assert _run(capsys, "2026", "-1FR", "--yearly", "--") == (0, "2026-12-25\n", "")
+    assert _run(capsys, "2026-11", "--", "-1FR") == (0, "2026-11-27\n", "")
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("2026", "--", "--"),
+        ("--", "2026", "--"),
+        ("--", "2026-02", "--"),
+        ("--yearly", "2026", "--", "--"),
+    ],
+)
+def test_a_second_double_dash_is_a_value(
+    capsys: pytest.CaptureFixture[str], args: tuple[str, ...]
+) -> None:
+    code, out, err = _run(capsys, *args)
+    assert (code, out) == (2, "")
+    assert "invalid BYDAY entry '--'" in err and "Traceback" not in err
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (("--", "--", "MO"), "period must be YYYY or YYYY-MM, got '--'"),
+        (("--", "2026", "--yearly"), "invalid BYDAY entry '--yearly'"),
+        (("-", "MO"), "period must be YYYY or YYYY-MM, got '-'"),
+        (("2026", "--", "--", "--"), "unrecognized arguments: '--'"),
+        (("2026", "-q", "MO", "x"), "unrecognized arguments: '-q x'"),
+        (("-q", "2026", "-q", "MO", "-q"), "unrecognized arguments: '-q'\n"),
+    ],
+)
+def test_values_are_read_in_order_and_the_rest_is_refused(
+    capsys: pytest.CaptureFixture[str], args: tuple[str, ...], message: str
+) -> None:
+    code, out, err = _run(capsys, *args)
+    assert (code, out) == (2, "")
+    assert message in err
+
+
+def _time_main(args: list[str]) -> float:
+    start = time.perf_counter()
+    out, err = io.StringIO(), io.StringIO()
+    quiet = contextlib.redirect_stdout(out), contextlib.redirect_stderr(err)
+    with quiet[0], quiet[1], contextlib.suppress(SystemExit):
+        main(args)
+    return time.perf_counter() - start
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda n: ["-q"] * n + ["-1FR"] * n,
+        lambda n: [f"-q{i}" for i in range(n)] + ["2026"] * n,
+        lambda n: ["--yearly"] * n + ["2026", "-1FR"],
+    ],
+)
+def test_splitting_the_arguments_takes_linear_time(build: Callable[[int], list[str]]) -> None:
+    small, large = build(2000), build(16000)
+    best_small = min(_time_main(small) for _ in range(3))
+    best_large = min(_time_main(large) for _ in range(3))
+    assert best_large < 8 * 4 * best_small + 0.05

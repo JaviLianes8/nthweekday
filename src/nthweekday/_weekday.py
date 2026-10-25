@@ -2,25 +2,39 @@
 
 from __future__ import annotations
 
+import inspect
 import operator
 from datetime import MAXYEAR, MINYEAR, date
 from enum import EnumMeta, IntEnum
-from typing import Any
+from typing import TypeVar
 
 _CODES = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
 # Error messages quote at most this many characters of what the caller passed.
 _QUOTE_LIMIT = 40
+_E = TypeVar("_E")
+_ONE_VALUE = inspect.Signature(
+    [inspect.Parameter("value", inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+)
 
 
 class _CheckedEnumType(EnumMeta):
-    def __call__(cls, value: Any, *args: Any, **kwargs: Any) -> Any:
+    # Typed through the class it is called on, so a checker that reads this signature
+    # (pyright does, mypy has its own enum rule) sees Weekday(n) return a Weekday.
+    def __call__(cls: type[_E], value: object, *args: object, **kwargs: object) -> _E:
         # A lookup by value matches True and 4.0 too, as they equal 1 and 4; check it first
         # so that Weekday(x) refuses what every function refuses. Extra arguments belong to
         # the functional API, which cannot extend an enum with members; a keyword alone
         # (module=, qualname=) would turn the call back into an unchecked lookup.
         if args or kwargs:
             raise TypeError("Weekday() takes one argument, the weekday number")
-        return super().__call__(_int_in("weekday", value, 0, 6))
+        day: _E = super().__call__(_int_in("weekday", value, 0, 6))  # type: ignore[misc]
+        return day
+
+    @property
+    def __signature__(cls) -> inspect.Signature:
+        # help() and inspect.signature() showed this metaclass before 3.12 and the enum
+        # functional API after; both hide the one-argument call.
+        return _ONE_VALUE
 
 
 class Weekday(IntEnum, metaclass=_CheckedEnumType):
