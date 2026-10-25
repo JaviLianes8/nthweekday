@@ -19,6 +19,7 @@ Progress:
 - [x] QA lenses round 1: every finding fixed (fcbfc64 and the report commit)
 - [x] Author follow-up: three more surviving mutants closed, one defect fixed (d89a99f)
 - [x] Resumed 2026-10-25: PyPI re-checked (404), CHANGELOG dated 2026-10-25, gates re-run
+- [x] QA lenses round 2 (a, c, e on 5c2d0db): every finding fixed (86ef53e and the report commit)
 - [ ] Five QA lenses report PASS (item 19)
 - [ ] Independent reviewer reports PASS (item 16)
 
@@ -35,7 +36,7 @@ Progress:
 | 7 | Real ground truth | PASS: 5 sources re-fetched 2026-10-24 (hashes unchanged), grammar read from the RFC text, `python-dateutil` and `calendar` oracles |
 | 8 | Real e2e from the wheel | PASS: built wheel in a fresh venv, CLI by subprocess, consumer typing; no PyPI release to upgrade from |
 | 9 | Seeded fuzz, no crash, hang or blowup | PASS: `tests/test_fuzz.py` |
-| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (424 passed, numpy test skipped, each; author follow-up); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
+| 10 | Supported Pythons | PASS: CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2, 3.14.2t (445 passed, numpy test skipped, each; QA round 2); 3.8 and 3.9 below `requires-python` (pip refuses the wheel on 3.9.25) |
 | 11 | README and `twine check` | PASS: `twine check --strict` on wheel and sdist, absolute links, badge |
 | 12 | Dated CHANGELOG section | PASS: 1.0.0, 2026-10-25 |
 | 13 | pyproject 1.0.0, Production/Stable | PASS |
@@ -43,7 +44,7 @@ Progress:
 | 15 | Gates each exit 0 | PASS: see Gates |
 | 16 | Independent reviewer | pending (orchestrator) |
 | 17 | PR and trace guard | PR from `release/1.0.0`, trace guard CLEAN; merge and publish left to the maintainer |
-| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4 |
+| 18 | Contracts bite (mutations) | PASS: author round 30 of 30 killed; round 1 follow-ups 14 of 14; author follow-up 4 of 4; QA round 2 fixes 10 of 10 |
 | 19 | Five independent QA lenses | pending (orchestrator) |
 
 ## Baseline on 0.2.0 (before any change)
@@ -165,7 +166,7 @@ killed; the column shows the first failing test.
 
 On this PC with the fetched sources present, each command on its own:
 `ruff format --check .`, `ruff check .`, `mypy --strict src`, `mypy --strict src tests`
-and `pytest` (425 passed after the author follow-up, the two opt-in e2e tests deselected)
+and `pytest` (446 passed after QA round 2, the two opt-in e2e tests deselected)
 exit 0; `pytest -m e2e` 2 passed.
 
 ## QA lenses (item 19) and independent review (item 16)
@@ -269,3 +270,59 @@ the fetched sources present on CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2, 3.14.2 
 free-threaded: 424 passed and 1 skipped (the real numpy test, numpy absent) on each.
 
 Disputed findings: none.
+
+### Round 2
+
+Lenses (a), (c) and (e) reviewed `release/1.0.0` at 5c2d0db and reported the findings
+below. Every one is fixed in 86ef53e. Each behaviour fix has a contract test that failed
+on 5c2d0db (run with the new tests on Python 3.10.19 and 3.13.2: 12 failed on 3.10, 6 on
+3.13, where argparse already handles a second `--` and is not quadratic) and passes now.
+e-F1 was a missing contract, not a defect: its test passes on 5c2d0db and kills the
+mutant.
+
+| Lens | Id | Finding | Fix | Contract |
+| --- | --- | --- | --- | --- |
+| a | a-F1 | `Weekday(n)` was typed `Any` for pyright (metaclass `__call__` returned `Any`) | `__call__(cls: type[_E], value: object, ...) -> _E`; pyright 1.1.405 strict on the lens's probe now reveals `Weekday` and reports the attribute and assignment errors (0 errors and `Any` on 5c2d0db) | `test_weekday_call.py::test_the_call_is_typed_to_return_the_class_it_is_called_on` |
+| a | a-F2 | `inspect.signature(Weekday)` and `help(Weekday)` showed `(value: Any, *args, **kwargs)` before 3.12 and `(*values)` after | the metaclass gives `__signature__` as `(value)` | `test_weekday_call.py::test_the_signature_is_one_value_on_every_version` |
+| a, c | a-F3, c-C1 | a signed BYDAY followed by `--` was read as an option (exit 2 on 3.10 to 3.13); a second `--` crashed on 3.10 and 3.11 (traceback, exit 1) | the command line splits its arguments itself in one pass: after the first `--` everything is a value, before it a signed BYDAY is a value; argparse only sees the options and stand-ins for the values, so its version-dependent `--` handling no longer matters; GUIDE and CHANGELOG | `test_cli_arguments.py::test_a_signed_byday_before_a_double_dash_is_still_a_value`, `test_a_second_double_dash_is_a_value` (4 argvs), `test_values_are_read_in_order_and_the_rest_is_refused` |
+| c | c-C2 | sorting out the arguments was quadratic (`a not in flags` on a list) | the one-pass split; argparse itself is quadratic in the number of options before 3.12, so each distinct option is read on its own and an unknown option given several times is reported once (CHANGELOG) | `test_cli_arguments.py::test_splitting_the_arguments_takes_linear_time` (3 shapes, 2,000 against 16,000 arguments) |
+| a, c | a-F4, c-C3 | `byday_dates` replaced an error of the caller's iterable with its own message and read a wrong-typed iterable to the end (`itertools.count()` never returned) | only `iter(value)` is guarded; entries are checked one at a time while read, so the first wrong entry stops the read; CHANGELOG | `test_byday.py::test_byday_dates_lets_errors_of_the_callers_iterable_through`, `test_byday_dates_stops_at_the_first_entry_of_the_wrong_type` |
+| e | e-F1 (B16) | no contract for a falsy month that is not `None` (`False`, `0`) | none needed | `test_byday.py::test_byday_dates_checks_a_falsy_month` (string, `ByDay` and list values) |
+
+Replayed on the fixed tree, on CPython 3.10.19, 3.11.5, 3.12.12, 3.13.2 and 3.14.2:
+`nthweekday 2026-11 -1FR --` prints 2026-11-27 and exits 0, `nthweekday 2026 -1FR
+--yearly --` prints 2026-12-25, `nthweekday 2026 -- --` and `nthweekday -- 2026 --`
+exit 2 with `invalid BYDAY entry '--'`, and `inspect.signature(Weekday)` is `(value)`.
+The lens's generator raising `TypeError` comes through with its own message and
+`__suppress_context__` false; an iterator of 10**7 ints is read once before the
+`TypeError`. A differential run of 29 argvs through `main` on 3.10 and 3.13 (help,
+version, abbreviations, unknown and long options, `--` placements, `-`, `+1FR`) gives
+the same exit code and output as 5c2d0db except the documented single report of a
+repeated unknown option.
+
+Mutants on these fixes, each applied alone to a copy of the tree, the new and the CLI
+test files run with `-x` on 3.10.19 and 3.13.2:
+
+| # | Mutation | Verdict | First test that failed |
+| --- | --- | --- | --- |
+| R01 | values after the first `--` dropped instead of read | killed | `test_cli_arguments.py::test_a_second_double_dash_is_a_value[args0]` |
+| R02 | a signed BYDAY taken for an option | killed | `test_cli_arguments.py::test_a_signed_byday_before_a_double_dash_is_still_a_value` |
+| R03 | repeated options not collapsed | killed (survived on 3.13 until the single-report vector was added) | `test_cli_arguments.py::test_values_are_read_in_order_and_the_rest_is_refused[args5]`; on 3.10 also the linear-time test |
+| R04 | values past the second ignored | killed | `test_cli_arguments.py::test_values_are_read_in_order_and_the_rest_is_refused[args3]` |
+| R05 | iterable read whole before the type check | killed | `test_byday.py::test_byday_dates_stops_at_the_first_entry_of_the_wrong_type` |
+| R06 | `tuple(value)` back inside the guard | killed | `test_byday.py::test_byday_dates_lets_errors_of_the_callers_iterable_through` |
+| R07 | `__signature__` removed | killed | `test_weekday_call.py::test_the_signature_is_one_value_on_every_version` |
+| R08 | `__call__` annotated `-> Any` again | killed | `test_weekday_call.py::test_the_call_is_typed_to_return_the_class_it_is_called_on` |
+| R09 | `--` honoured only in first position | killed | `test_cli_arguments.py::test_a_second_double_dash_is_a_value[args0]` |
+| B16 | `if month:` for `if month is not None:` (lens e) | killed | `test_byday.py::test_byday_dates_checks_a_falsy_month[MO]` |
+
+Re-verified under a machine turn on this PC: `pytest` 446 passed, `pytest -m e2e` 2
+passed; the sdist and the wheel built from it pass `twine check --strict`, the wheel holds
+the package, `py.typed`, the entry point and LICENSE only; the wheel in a fresh venv and
+the sdist's suite with `src` removed and the fetched sources present on CPython 3.10.19,
+3.11.5, 3.12.12, 3.13.2, 3.14.2 and 3.14.2 free-threaded: 445 passed and 1 skipped (the
+real numpy test, numpy absent) on each (the first 3.11.5 run printed no summary line; it
+was run again on its own and passed). Gates on the tree: `ruff format --check .`,
+`ruff check .`, `mypy --strict src`, `mypy --strict src tests` and `pytest` exit 0.
+
+Disputed findings (round 2): none.
